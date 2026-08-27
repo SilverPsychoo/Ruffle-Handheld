@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld control profile library v0.8.1.
+# Ruffle Handheld control profile library v0.7.7.
 # Profiles are plain key=value files. No profile content is executed as shell code.
 # This release targets the frozen ruffle4consoles frontend bundled with the project.
 

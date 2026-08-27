@@ -8,8 +8,8 @@
     "items_opt": null,
     "attr": {
         "title": "Ruffle Handheld",
-        "desc": "Offline Flash game integration for ARM64 Linux handhelds using Ruffle-derived runtimes and per-game controller profiles.",
-        "inst": "Launch Ruffle Handheld once. It creates the Flash game folders and registers the Flash system in EmulationStation.",
+        "desc": "Offline Flash integration for ARM64 Linux handhelds, with the unchanged v0.7.7 runtime core and all profiles kept inside Ruffle Handheld.",
+        "inst": "One universal launcher and one application folder. On EmuELEC place the .sh in ports_scripts and rufflehandheld in ports; on other CFWs use their normal Ports location. The same launcher detects the CFW and locates the application without downloading anything.",
         "genres": [
             "other"
         ],

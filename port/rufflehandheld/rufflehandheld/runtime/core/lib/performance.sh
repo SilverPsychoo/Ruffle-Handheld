@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld performance helper v0.8.0
+# Ruffle Handheld performance helper v0.7.6
 # Safe governor boost for EmuELEC/RK3326-class devices.
 # No overclocking: only selects the kernel's existing "performance" governor.
 

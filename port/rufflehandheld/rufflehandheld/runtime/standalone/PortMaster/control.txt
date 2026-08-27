@@ -1,0 +1,17 @@
+#!/bin/bash
+# Minimal offline adapter used only when a real PortMaster control.txt is absent.
+# It intentionally does not replace PortMaster controller discovery.
+
+directory="${RUFFLE_STANDALONE_DIRECTORY:-storage/roms}"
+CFW_NAME="${CFW_NAME:-standalone}"
+CFW_VERSION="${CFW_VERSION:-}"
+DEVICE_NAME="${DEVICE_NAME:-unknown}"
+DEVICE_ARCH="${DEVICE_ARCH:-$(uname -m 2>/dev/null || echo aarch64)}"
+DISPLAY_WIDTH="${DISPLAY_WIDTH:-}"
+DISPLAY_HEIGHT="${DISPLAY_HEIGHT:-}"
+ESUDO="${ESUDO:-}"
+sdl_controllerconfig="${sdl_controllerconfig:-${SDL_GAMECONTROLLERCONFIG:-}}"
+
+get_controls() { return 0; }
+pm_platform_helper() { return 0; }
+pm_finish() { return 0; }
