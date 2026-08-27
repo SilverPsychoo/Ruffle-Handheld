@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<gameList>
+  <game>
+    <path>./Ruffle Handheld.sh</path>
+    <name>Ruffle Handheld</name>
+    <desc>Sets up the Flash library and bundled Ruffle Handheld runtime.</desc>
+    <genre>Other</genre>
+  </game>
+</gameList>

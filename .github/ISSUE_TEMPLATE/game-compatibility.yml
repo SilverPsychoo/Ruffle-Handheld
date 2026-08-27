@@ -1,0 +1,57 @@
+name: Game compatibility report
+description: Report how a Flash game behaves on your handheld.
+title: "[Game] "
+labels: ["compatibility"]
+body:
+  - type: input
+    id: game
+    attributes: {label: Game, placeholder: "Game title"}
+    validations: {required: true}
+  - type: input
+    id: swf
+    attributes: {label: SWF filename, placeholder: "game.swf"}
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes: {label: Ruffle Handheld version, placeholder: "0.8.1"}
+    validations: {required: true}
+  - type: input
+    id: device
+    attributes: {label: Device, placeholder: "RGB30, R36S, RG35XX H..."}
+    validations: {required: true}
+  - type: input
+    id: cfw
+    attributes: {label: CFW / OS, placeholder: "ArkOS, ROCKNIX, muOS, EmuELEC..."}
+    validations: {required: true}
+  - type: input
+    id: soc
+    attributes: {label: SoC / architecture, placeholder: "RK3326 / aarch64"}
+  - type: dropdown
+    id: status
+    attributes:
+      label: Compatibility status
+      options: [Perfect, Playable, Partial, Boots, "Doesn't open", Black screen, Crash, Needs assets]
+    validations: {required: true}
+  - type: dropdown
+    id: performance
+    attributes:
+      label: Performance
+      options: [High, Medium, Low, Unknown, N/A]
+    validations: {required: true}
+  - type: dropdown
+    id: controls
+    attributes:
+      label: Controls
+      options: [Working, Custom profile, Partial, Mouse-only, Needs profile, Broken]
+    validations: {required: true}
+  - type: dropdown
+    id: audio
+    attributes:
+      label: Audio
+      options: [Works, Issues, No audio, Unknown, N/A]
+  - type: textarea
+    id: notes
+    attributes: {label: Notes, description: "Describe what works, what fails, and any special files the game needs."}
+  - type: textarea
+    id: logs
+    attributes: {label: Logs, description: "Attach or paste logs when a game crashes, shows a black screen, or does not open."}

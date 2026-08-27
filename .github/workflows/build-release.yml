@@ -1,0 +1,19 @@
+name: Build offline release
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: python tools/build_release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rufflehandheld-offline-release
+          path: releases/rufflehandheld.zip

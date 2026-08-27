@@ -1,0 +1,27 @@
+{
+    "version": 2,
+    "name": "rufflehandheld.zip",
+    "items": [
+        "Ruffle Handheld.sh",
+        "rufflehandheld/"
+    ],
+    "items_opt": null,
+    "attr": {
+        "title": "Ruffle Handheld",
+        "desc": "Offline Flash game integration for ARM64 Linux handhelds using Ruffle-derived runtimes and per-game controller profiles.",
+        "inst": "Launch Ruffle Handheld once. It creates the Flash game folders and registers the Flash system in EmulationStation.",
+        "genres": [
+            "other"
+        ],
+        "porter": [
+            "Ruffle Handheld contributors"
+        ],
+        "image": {},
+        "rtr": true,
+        "runtime": null,
+        "reqs": [],
+        "arch": [
+            "aarch64"
+        ]
+    }
+}

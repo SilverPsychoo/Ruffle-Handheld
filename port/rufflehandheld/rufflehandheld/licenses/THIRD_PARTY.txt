@@ -1,0 +1,17 @@
+# Third-party components
+
+Ruffle Handheld is a launcher/integration project. Flash emulation is provided by Ruffle-derived components.
+
+## Ruffle / ruffle4consoles
+
+- Ruffle: https://ruffle.rs/
+- ruffle4consoles: https://github.com/Hexadecinull/ruffle4consoles
+- License: MIT OR Apache-2.0
+- Copyright belongs to Ruffle LLC and the respective contributors.
+
+## PortMaster / gptokeyb2
+
+- https://github.com/PortsMaster/gptokeyb2
+- Used only when available on the target system for the standard Select+Start quit helper.
+
+No Flash game SWFs are distributed by this repository.
