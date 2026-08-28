@@ -4,13 +4,12 @@
 name=Dad n Me
 aliases=dadnme|dad-n-me|dad-nme|dad-n-me-game|dad-n-me-flash
 mouse_click=r1
-native_a_mode=disabled
 
 dpad_up=38
 dpad_down=40
 dpad_left=37
 dpad_right=39
-south=0
+south=none
 east=none
 west=83
 north=65

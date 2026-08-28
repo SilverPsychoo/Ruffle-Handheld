@@ -16,4 +16,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: rufflehandheld-offline-release
-          path: releases/rufflehandheld.zip
+          path: releases/Ruffle-Handheld-v*-OFFLINE.zip

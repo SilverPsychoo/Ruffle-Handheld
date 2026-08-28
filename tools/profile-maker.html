@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ruffle Handheld · Creador de perfiles</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0c1117;
+      --panel: #141c25;
+      --panel-2: #1a2530;
+      --line: #2b3a49;
+      --text: #f4f7fa;
+      --muted: #a8b4bf;
+      --red: #e64b3c;
+      --orange: #ff9b45;
+      --green: #61d095;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top right, #291c19 0, var(--bg) 35rem);
+      color: var(--text);
+      font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: min(1040px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 64px; }
+    header { display: flex; gap: 22px; align-items: center; margin-bottom: 26px; }
+    header img { width: 92px; height: 92px; object-fit: contain; }
+    .heading { min-width: 0; }
+    h1 { margin: 0 0 5px; font-size: clamp(1.7rem, 4vw, 2.6rem); }
+    h2 { margin: 0 0 18px; font-size: 1.2rem; }
+    p { margin: 0; }
+    .muted { color: var(--muted); }
+    .language-picker { display: flex; gap: 8px; margin-left: auto; }
+    .language-picker button { padding: 8px 12px; background: var(--panel-2); }
+    .language-picker button[aria-pressed="true"] { border-color: var(--orange); color: #ffd4ae; }
+    .panel {
+      padding: 22px;
+      margin: 16px 0;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
+      box-shadow: 0 14px 40px rgb(0 0 0 / 22%);
+    }
+    .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+    label { display: grid; gap: 6px; color: var(--muted); font-size: .9rem; }
+    input, select, textarea, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0d141c;
+      color: var(--text);
+      padding: 11px 12px;
+      font: inherit;
+    }
+    input:focus, select:focus, textarea:focus, button:focus-visible {
+      outline: 2px solid var(--orange);
+      outline-offset: 1px;
+    }
+    select:disabled { opacity: .48; }
+    .map-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .map-card { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+    .map-card label { color: var(--text); font-weight: 700; }
+    .map-card small { display: block; min-height: 1.2em; margin-top: 6px; color: var(--muted); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    button { width: auto; cursor: pointer; font-weight: 750; }
+    button.primary { border-color: transparent; background: linear-gradient(135deg, var(--red), var(--orange)); color: white; }
+    button.secondary { background: var(--panel-2); }
+    textarea { min-height: 260px; resize: vertical; font: 13px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    code { padding: 2px 6px; border-radius: 6px; background: #0a1016; color: #ffd4ae; }
+    ol { margin-bottom: 0; padding-left: 22px; }
+    li + li { margin-top: 7px; }
+    #status { min-height: 1.4em; margin-top: 12px; color: var(--green); font-weight: 700; }
+    .file-button { position: relative; overflow: hidden; }
+    .file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    @media (max-width: 760px) {
+      .map-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      header { align-items: flex-start; flex-wrap: wrap; }
+      .language-picker { width: 100%; margin-left: 114px; }
+    }
+    @media (max-width: 520px) {
+      main { width: min(100% - 20px, 1040px); padding-top: 20px; }
+      header img { width: 68px; height: 68px; }
+      .language-picker { margin-left: 0; }
+      .fields, .map-grid { grid-template-columns: 1fr; }
+      .panel { padding: 17px; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="theme/system.png" alt="Adobe Flash Player">
+    <div class="heading">
+      <h1 data-i18n="title">Creador de perfiles</h1>
+      <p class="muted" data-i18n="subtitle">Ruffle Handheld · Creador de controles offline</p>
+    </div>
+    <nav class="language-picker" aria-label="Language / Idioma">
+      <button id="langEs" type="button" data-language="es" aria-pressed="true">Español</button>
+      <button id="langEn" type="button" data-language="en" aria-pressed="false">English</button>
+    </nav>
+  </header>
+
+  <section class="panel">
+    <h2 data-i18n="gameSection">1. Juego</h2>
+    <div class="fields">
+      <label><span data-i18n="displayName">Nombre visible</span>
+        <input id="gameName" value="Mi juego Flash" maxlength="100" data-i18n-placeholder="displayPlaceholder">
+      </label>
+      <label><span data-i18n="swfFilename">Nombre exacto del archivo SWF</span>
+        <input id="swfName" value="Mi juego Flash.swf" maxlength="180" spellcheck="false" data-i18n-placeholder="swfPlaceholder">
+      </label>
+      <label style="grid-column:1/-1"><span data-i18n="aliases">Otros nombres opcionales, separados por |</span>
+        <input id="aliases" placeholder="mi-juego|my-flash-game" maxlength="300" spellcheck="false" data-i18n-placeholder="aliasesPlaceholder">
+      </label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 data-i18n="buttonsSection">2. Botones</h2>
+    <div id="mapGrid" class="map-grid"></div>
+    <div class="fields" style="margin-top:16px">
+      <label><span data-i18n="mouseClick">Botón para clic izquierdo</span>
+        <select id="mouseClick"></select>
+      </label>
+      <label><span data-i18n="generatedFilename">Nombre del perfil generado</span>
+        <input id="outputName" readonly>
+      </label>
+    </div>
+    <p id="conflict" class="muted" style="margin-top:12px"></p>
+  </section>
+
+  <section class="panel">
+    <h2 data-i18n="saveSection">3. Guardar</h2>
+    <ol>
+      <li data-i18n="saveStep1">Descarga el perfil.</li>
+      <li><span data-i18n="saveStep2Before">Cópialo a</span> <code>ROMS/ports/rufflehandheld/profiles/custom/</code>.</li>
+      <li data-i18n="saveStep3">Abre el juego normalmente. No necesitas reinstalar.</li>
+    </ol>
+    <p class="muted" style="margin-top:12px" data-i18n="updateNote">Las actualizaciones conservan profiles/custom/ y los perfiles personalizados tienen prioridad.</p>
+    <div class="actions">
+      <button id="download" class="primary" type="button" data-i18n="download">Descargar perfil</button>
+      <button id="copy" class="secondary" type="button" data-i18n="copy">Copiar texto</button>
+      <button class="secondary file-button" type="button"><span data-i18n="edit">Editar perfil existente</span><input id="load" type="file" accept=".profile,text/plain" data-i18n-aria="edit"></button>
+    </div>
+    <p id="status" role="status"></p>
+    <textarea id="preview" readonly aria-label="Vista previa del perfil" data-i18n-aria="preview"></textarea>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const text = {
+    es: {
+      documentTitle: 'Ruffle Handheld · Creador de perfiles',
+      title: 'Creador de perfiles',
+      subtitle: 'Ruffle Handheld · Creador de controles offline',
+      gameSection: '1. Juego',
+      displayName: 'Nombre visible',
+      displayPlaceholder: 'Mi juego Flash',
+      swfFilename: 'Nombre exacto del archivo SWF',
+      swfPlaceholder: 'Mi juego Flash.swf',
+      aliases: 'Otros nombres opcionales, separados por |',
+      aliasesPlaceholder: 'mi-juego|otro-nombre',
+      buttonsSection: '2. Botones',
+      mouseClick: 'Botón para clic izquierdo',
+      generatedFilename: 'Nombre del perfil generado',
+      saveSection: '3. Guardar',
+      saveStep1: 'Descarga el perfil.',
+      saveStep2Before: 'Cópialo a',
+      saveStep3: 'Abre el juego normalmente. No necesitas reinstalar.',
+      updateNote: 'Las actualizaciones conservan profiles/custom/ y los perfiles personalizados tienen prioridad.',
+      download: 'Descargar perfil',
+      copy: 'Copiar texto',
+      edit: 'Editar perfil existente',
+      preview: 'Vista previa del perfil',
+      conflictReserved: 'Reservado para clic',
+      conflictButton: 'El botón elegido para clic no enviará también una tecla.',
+      conflictR1: 'R1 evita conflictos con las acciones del juego.',
+      downloaded: 'Perfil descargado: {value}',
+      copied: 'Perfil copiado',
+      editing: 'Editando: {value}',
+      dpad_up: 'Cruceta ↑', dpad_down: 'Cruceta ↓', dpad_left: 'Cruceta ←', dpad_right: 'Cruceta →',
+      south: 'A', east: 'B', west: 'X', north: 'Y', start: 'Start', select: 'Select', left_trigger: 'L1',
+      none: 'Sin acción', up: 'Flecha arriba', down: 'Flecha abajo', left: 'Flecha izquierda', right: 'Flecha derecha',
+      clickR1: 'R1 (recomendado)', clickA: 'A', clickB: 'B', clickX: 'X', clickY: 'Y', clickStart: 'Start', clickSelect: 'Select', clickNone: 'Sin clic'
+    },
+    en: {
+      documentTitle: 'Ruffle Handheld · Profile Maker',
+      title: 'Profile Maker',
+      subtitle: 'Ruffle Handheld · Offline control profile maker',
+      gameSection: '1. Game',
+      displayName: 'Display name',
+      displayPlaceholder: 'My Flash game',
+      swfFilename: 'Exact SWF filename',
+      swfPlaceholder: 'My Flash game.swf',
+      aliases: 'Optional alternate names, separated by |',
+      aliasesPlaceholder: 'my-game|another-name',
+      buttonsSection: '2. Buttons',
+      mouseClick: 'Left mouse click button',
+      generatedFilename: 'Generated profile filename',
+      saveSection: '3. Save',
+      saveStep1: 'Download the profile.',
+      saveStep2Before: 'Copy it into',
+      saveStep3: 'Launch the game normally. Reinstallation is not required.',
+      updateNote: 'Updates preserve profiles/custom/ and custom profiles take priority.',
+      download: 'Download profile',
+      copy: 'Copy text',
+      edit: 'Edit existing profile',
+      preview: 'Profile preview',
+      conflictReserved: 'Reserved for click',
+      conflictButton: 'The selected click button will not also send a keyboard key.',
+      conflictR1: 'R1 avoids conflicts with game actions.',
+      downloaded: 'Profile downloaded: {value}',
+      copied: 'Profile copied',
+      editing: 'Editing: {value}',
+      dpad_up: 'D-pad Up', dpad_down: 'D-pad Down', dpad_left: 'D-pad Left', dpad_right: 'D-pad Right',
+      south: 'A', east: 'B', west: 'X', north: 'Y', start: 'Start', select: 'Select', left_trigger: 'L1',
+      none: 'None', up: 'Arrow Up', down: 'Arrow Down', left: 'Arrow Left', right: 'Arrow Right',
+      clickR1: 'R1 (recommended)', clickA: 'A', clickB: 'B', clickX: 'X', clickY: 'Y', clickStart: 'Start', clickSelect: 'Select', clickNone: 'No click'
+    }
+  };
+
+  const keyOptions = [
+    ['none', 'none'], ['38', 'up'], ['40', 'down'], ['37', 'left'], ['39', 'right'],
+    ['32', 'Space'], ['13', 'Enter'], ['27', 'Escape'], ['16', 'Shift'], ['17', 'Ctrl'], ['8', 'Backspace'], ['9', 'Tab'],
+    ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => [String(letter.charCodeAt(0)), letter]),
+    ...'0123456789'.split('').map(number => [String(number.charCodeAt(0)), number])
+  ];
+  const clickOptions = [
+    ['r1', 'clickR1'], ['a', 'clickA'], ['b', 'clickB'], ['x', 'clickX'], ['y', 'clickY'],
+    ['start', 'clickStart'], ['back', 'clickSelect'], ['none', 'clickNone']
+  ];
+  const bindings = [
+    ['dpad_up', '38'], ['dpad_down', '40'], ['dpad_left', '37'], ['dpad_right', '39'],
+    ['south', '32'], ['east', '90'], ['west', '88'], ['north', '67'],
+    ['start', '13'], ['select', '27'], ['left_trigger', '16']
+  ];
+  const clickToBinding = { a: 'south', b: 'east', x: 'west', y: 'north', start: 'start', back: 'select' };
+  const $ = id => document.getElementById(id);
+  let language = /^en\b/i.test(navigator.language || '') ? 'en' : 'es';
+
+  function tr(key) {
+    return text[language][key] || key;
+  }
+
+  function format(key, value) {
+    return tr(key).replace('{value}', value);
+  }
+
+  function localizedOptionLabel(key) {
+    return text[language][key] || key;
+  }
+
+  function populateOptions(select, options, selected) {
+    select.textContent = '';
+    for (const [value, labelKey] of options) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = localizedOptionLabel(labelKey);
+      option.selected = value === selected;
+      select.append(option);
+    }
+  }
+
+  const grid = $('mapGrid');
+  for (const [id, defaultValue] of bindings) {
+    const card = document.createElement('div');
+    card.className = 'map-card';
+    const wrapper = document.createElement('label');
+    wrapper.htmlFor = id;
+    const label = document.createElement('span');
+    label.dataset.i18n = id;
+    const select = document.createElement('select');
+    select.id = id;
+    select.dataset.default = defaultValue;
+    populateOptions(select, keyOptions, defaultValue);
+    const note = document.createElement('small');
+    note.id = `${id}-note`;
+    wrapper.append(label, select, note);
+    card.append(wrapper);
+    grid.append(card);
+  }
+  populateOptions($('mouseClick'), clickOptions, 'r1');
+
+  function oneLine(value) {
+    return String(value || '').replace(/[\r\n=]+/g, ' ').trim();
+  }
+
+  function normalize(value) {
+    return oneLine(value)
+      .replace(/\.swf$/i, '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'my-game';
+  }
+
+  function syncClickButton() {
+    for (const [id] of bindings) {
+      $(id).disabled = false;
+      $(`${id}-note`).textContent = '';
+    }
+    const conflictId = clickToBinding[$('mouseClick').value];
+    if (conflictId) {
+      $(conflictId).disabled = true;
+      $(`${conflictId}-note`).textContent = tr('conflictReserved');
+      $('conflict').textContent = tr('conflictButton');
+    } else {
+      $('conflict').textContent = tr('conflictR1');
+    }
+  }
+
+  function profileText() {
+    const swf = oneLine($('swfName').value) || 'my-game.swf';
+    const stem = swf.replace(/\.swf$/i, '');
+    const name = oneLine($('gameName').value) || stem;
+    const aliases = oneLine($('aliases').value).split('|').map(oneLine).filter(Boolean).map(normalize).join('|');
+    const click = $('mouseClick').value;
+    const values = Object.fromEntries(bindings.map(([id]) => [id, $(id).disabled ? 'none' : $(id).value]));
+    const output = normalize(stem) + '.profile';
+    $('outputName').value = output;
+
+    return [
+      '# Generated by Ruffle Handheld Profile Maker. / Generado por el Creador de perfiles de Ruffle Handheld.',
+      `name=${name}`,
+      `aliases=${aliases}`,
+      `mouse_click=${click}`,
+      '',
+      `dpad_up=${values.dpad_up}`,
+      `dpad_down=${values.dpad_down}`,
+      `dpad_left=${values.dpad_left}`,
+      `dpad_right=${values.dpad_right}`,
+      `south=${values.south}`,
+      `east=${values.east}`,
+      `west=${values.west}`,
+      `north=${values.north}`,
+      `start=${values.start}`,
+      `select=${values.select}`,
+      `left_trigger=${values.left_trigger}`,
+      'right_trigger=none',
+      ''
+    ].join('\n');
+  }
+
+  function refresh() {
+    syncClickButton();
+    $('preview').value = profileText();
+  }
+
+  function applyLanguage(nextLanguage) {
+    const oldKeyValues = Object.fromEntries(bindings.map(([id]) => [id, $(id).value]));
+    const oldClick = $('mouseClick').value;
+    language = nextLanguage === 'en' ? 'en' : 'es';
+    document.documentElement.lang = language;
+    document.title = tr('documentTitle');
+    if (['Mi juego Flash', 'My Flash game'].includes($('gameName').value)) $('gameName').value = tr('displayPlaceholder');
+    if (['Mi juego Flash.swf', 'My Flash game.swf'].includes($('swfName').value)) $('swfName').value = tr('swfPlaceholder');
+    document.querySelectorAll('[data-i18n]').forEach(node => { node.textContent = tr(node.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(node => { node.placeholder = tr(node.dataset.i18nPlaceholder); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(node => { node.setAttribute('aria-label', tr(node.dataset.i18nAria)); });
+    for (const [id] of bindings) populateOptions($(id), keyOptions, oldKeyValues[id]);
+    populateOptions($('mouseClick'), clickOptions, oldClick);
+    document.querySelectorAll('[data-language]').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.language === language));
+    });
+    try { localStorage.setItem('ruffleHandheldLanguage', language); } catch (_) {}
+    $('status').textContent = '';
+    refresh();
+  }
+
+  function parseProfile(profile, filename) {
+    const values = {};
+    for (const line of profile.split(/\r?\n/)) {
+      const clean = line.trim();
+      if (!clean || clean.startsWith('#') || !clean.includes('=')) continue;
+      const at = clean.indexOf('=');
+      values[clean.slice(0, at).trim()] = clean.slice(at + 1).trim();
+    }
+    $('gameName').value = values.name || filename.replace(/\.profile$/i, '');
+    $('swfName').value = filename.replace(/\.profile$/i, '') + '.swf';
+    $('aliases').value = values.aliases || '';
+    $('mouseClick').value = values.mouse_click || 'r1';
+    for (const [id] of bindings) {
+      const desired = values[id] || 'none';
+      if ([...$(id).options].some(option => option.value === desired)) $(id).value = desired;
+    }
+    refresh();
+  }
+
+  document.addEventListener('input', refresh);
+  document.addEventListener('change', refresh);
+  document.querySelectorAll('[data-language]').forEach(button => {
+    button.addEventListener('click', () => applyLanguage(button.dataset.language));
+  });
+
+  $('download').addEventListener('click', () => {
+    refresh();
+    const blob = new Blob([$('preview').value], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = $('outputName').value;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    $('status').textContent = format('downloaded', link.download);
+  });
+
+  $('copy').addEventListener('click', async () => {
+    refresh();
+    try {
+      await navigator.clipboard.writeText($('preview').value);
+    } catch (_) {
+      $('preview').select();
+      document.execCommand('copy');
+    }
+    $('status').textContent = tr('copied');
+  });
+
+  $('load').addEventListener('change', event => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      parseProfile(String(reader.result || ''), file.name);
+      $('status').textContent = format('editing', file.name);
+    };
+    reader.readAsText(file);
+  });
+
+  try {
+    const savedLanguage = localStorage.getItem('ruffleHandheldLanguage');
+    if (savedLanguage === 'es' || savedLanguage === 'en') language = savedLanguage;
+  } catch (_) {}
+  applyLanguage(language);
+})();
+</script>
+</body>
+</html>

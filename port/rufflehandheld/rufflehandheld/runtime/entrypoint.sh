@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.17 path adapter.
+# Ruffle Handheld v0.8.21 path adapter.
 # The v0.7.7 dispatcher and Native launchers remain byte-identical under core/.
 
 set -u

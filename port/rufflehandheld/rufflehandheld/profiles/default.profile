@@ -3,7 +3,6 @@
 name=Generic Flash
 aliases=generic|default
 mouse_click=r1
-native_a_mode=keyboard
 
 dpad_up=38
 dpad_down=40

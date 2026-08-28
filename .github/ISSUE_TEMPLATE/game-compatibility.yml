@@ -13,7 +13,7 @@ body:
     validations: {required: true}
   - type: input
     id: version
-    attributes: {label: Ruffle Handheld version, placeholder: "0.8.1"}
+    attributes: {label: Ruffle Handheld version, placeholder: "0.8.17"}
     validations: {required: true}
   - type: input
     id: device
@@ -30,7 +30,7 @@ body:
     id: status
     attributes:
       label: Compatibility status
-      options: [Perfect, Playable, Partial, Boots, "Doesn't open", Black screen, Crash, Needs assets]
+      options: [Perfect, Playable, Partial, Boots, "Doesn't open", Black screen, White screen, Crash, Needs assets]
     validations: {required: true}
   - type: dropdown
     id: performance

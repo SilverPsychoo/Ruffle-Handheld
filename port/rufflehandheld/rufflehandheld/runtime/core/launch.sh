@@ -1,6 +1,7 @@
 #!/bin/bash
 # Ruffle Handheld v0.7.7 dispatcher
 # Native controller input + per-game Ruffle profiles + click-only PortMaster helper.
+# v0.8.21 policy: raw physical A is never passed directly to the frozen frontend.
 
 ENGINE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)"
 ROMROOT="$(dirname "$ENGINE_DIR")"
@@ -70,8 +71,15 @@ start_click_helper() {
     proc="$1"; profile="$2"; defaults="$PROFILEDIR/default.profile"
     cfg="/tmp/ruffle_native_click_$$.gptk.ini"; ilog="$LOGDIR/input-helper.log"
     click="$(rh_profile_value "$profile" "$defaults" mouse_click 2>/dev/null || true)"
+    legacy_a_mode="$(rh_profile_value "$profile" "$defaults" native_a_mode 2>/dev/null || true)"
     [ -n "$click" ] || click="r1"
     case "$click" in a|b|x|y|l1|l2|l3|r1|r2|r3|start|back) ;; none|NONE|None) click="" ;; *) click="r1" ;; esac
+    # Old mouse-only profiles used raw Native A and therefore declared no
+    # helper click. Native A is no longer allowed; preserve usability by moving
+    # that old implicit click through the explicit helper during launch without
+    # rewriting user files. A remains the expected click for mouse-only games,
+    # but Ruffle itself no longer receives raw A/South.
+    [ "$legacy_a_mode" = "native" ] && [ -z "$click" ] && click="a"
     {
         echo '[config]'
         echo 'deadzone_triggers = 3000'

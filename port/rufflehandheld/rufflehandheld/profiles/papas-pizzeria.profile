@@ -1,8 +1,8 @@
-# Mouse-only: right stick = native cursor; A = native click.
+# Mouse-only: right stick = native cursor; A = profile-controlled click.
+# A clicks only through gptokeyb2; Ruffle receives no A keyboard action.
 name=Papa's Pizzeria
 aliases=papa-s-pizzeria|papa-pizzeria|papas-pizzeria
-mouse_click=none
-native_a_mode=native
+mouse_click=a
 
 dpad_up=none
 dpad_down=none

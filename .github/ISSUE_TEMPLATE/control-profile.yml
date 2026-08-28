@@ -1,29 +1,53 @@
-name: Control profile submission
-description: Propose or improve a per-game controller profile.
+name: "Control profile submission"
+description: "Propose or improve a per-game controller profile."
 title: "[Controls] "
-labels: ["controls"]
+labels:
+  - "controls"
 body:
   - type: input
     id: game
-    attributes: {label: Game}
-    validations: {required: true}
+    attributes:
+      label: "Game"
+      placeholder: "Game title"
+    validations:
+      required: true
+
   - type: input
     id: swf
-    attributes: {label: SWF filename}
-    validations: {required: true}
+    attributes:
+      label: "SWF filename"
+      placeholder: "game.swf"
+    validations:
+      required: true
+
   - type: input
     id: device
-    attributes: {label: Device / CFW}
-    validations: {required: true}
+    attributes:
+      label: "Device / CFW"
+      placeholder: "R36S / EmuELEC, RGB30 / ROCKNIX..."
+    validations:
+      required: true
+
   - type: textarea
     id: original
-    attributes: {label: Original keyboard / mouse controls, description: "Example: arrows move, S jumps, mouse clicks menus."}
-    validations: {required: true}
+    attributes:
+      label: "Original keyboard / mouse controls"
+      description: "Example: arrow keys move, S jumps, mouse clicks menus."
+    validations:
+      required: true
+
   - type: textarea
     id: mapping
-    attributes: {label: Proposed handheld mapping, description: "List D-pad, A/B/X/Y, shoulders, Start/Select, sticks and click button."}
-    validations: {required: true}
+    attributes:
+      label: "Proposed handheld mapping"
+      description: "Prefer attaching the .profile created with profile-maker.html. Otherwise list D-pad, A/B/X/Y, shoulders, Start/Select, sticks and click button."
+    validations:
+      required: true
+
   - type: textarea
     id: testing
-    attributes: {label: What did you test?, description: "State which actions you verified in-game."}
-    validations: {required: true}
+    attributes:
+      label: "What did you test?"
+      description: "State which actions you verified in-game."
+    validations:
+      required: true

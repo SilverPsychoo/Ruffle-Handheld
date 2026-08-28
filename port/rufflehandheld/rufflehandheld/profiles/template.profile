@@ -1,15 +1,15 @@
-# Copy and rename to the normalized SWF name.
-# Keyboard values are Flash/Windows key codes. Use none to disable.
-# Physical A is `south`. Map it for keyboard/hybrid games; use south=none for mouse-only games.
+# Prefer profile-maker.html instead of editing numeric key codes manually.
+# Copy and rename to the normalized SWF name only when editing by hand.
+# Physical A is `south`; use mouse_click=a for an explicit mouse click.
 name=My Game
 aliases=my-game|another-filename
 mouse_click=r1
-native_a_mode=keyboard
 
 dpad_up=38
 dpad_down=40
 dpad_left=37
 dpad_right=39
+south=none
 east=90
 west=88
 north=67

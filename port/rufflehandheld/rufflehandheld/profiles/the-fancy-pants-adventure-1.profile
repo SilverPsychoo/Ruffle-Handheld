@@ -4,7 +4,6 @@
 name=Fancy Pants Adventure World 1
 aliases=fancy-pants-adventure|fancy-pants|the-fancy-pants-adventure|fancy-pants-adventure-world-1|the-fancy-pants-adventure-1
 mouse_click=r1
-native_a_mode=keyboard
 
 dpad_up=38
 dpad_down=40

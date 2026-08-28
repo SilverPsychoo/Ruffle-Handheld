@@ -1,376 +1,189 @@
 # Ruffle Handheld
 
-[Español](README.es.md)
+[Leer en Español](README.es.md)
 
-Ruffle Handheld is an offline Flash game launcher for ARM64 Linux handhelds. It bundles a Ruffle-derived console runtime, integrates Flash games into EmulationStation, supports per-game controller profiles, and handles both single-file and multi-file Flash games.
+Ruffle Handheld integrates Flash games on ARM64 Linux handhelds without Internet access. Version 0.8.21 keeps the proven v0.7.7 ARM64 binaries, cursor shim and performance helper byte-for-byte. It adds six community profiles and a visual control-profile editor fully available in English and Spanish.
 
-**No Flash games are included. No Adobe Flash Player files are included.**
+> **Status:** community preview. Tested hardware: **RK3326 / aarch64**. Tested CFW: **EmuELEC**. ArkOS, ROCKNIX, AmberELEC, muOS and Knulli are detected so setup can select a conservative adapter, but they are not yet claimed as verified support.
 
-## Current support
+## Offline installation
 
-- Architecture: **aarch64 / ARM64**.
-- First real-device testing: RK3326 handheld + EmuELEC.
-- Community test targets include ArkOS, ROCKNIX, muOS, Knulli, AmberELEC and other Linux handheld environments.
-- PortMaster helpers are used when available, but the release itself is fully offline and includes its runtime.
-- The project is not tied to one console model.
-
-## Installation
-
-### Manual / offline installation
-
-Download the latest offline ZIP from **Releases**. It contains only:
+Like a standard PortMaster port, the ZIP contains exactly one launcher and one folder:
 
 ```text
 Ruffle Handheld.sh
 rufflehandheld/
 ```
 
-Copy both items into the handheld's **Ports** folder, then launch **Ruffle Handheld** once from the Ports menu.
+On **EmuELEC**, place that same launcher at `ROMS/ports_scripts/Ruffle Handheld.sh` and the folder at `ROMS/ports/rufflehandheld/`. On ArkOS and other CFWs, install the same two items with PortMaster or in that system's normal Ports location. There is no separate `.sh` edition for each CFW.
 
-The first run:
+When executed, the single launcher detects the ROM root and validates the application under `ports/rufflehandheld/` using sentinel files. It does not assume the folder is beside the `.sh`, so EmuELEC can start it from `ports_scripts/`.
 
-1. Detects the ROM root when possible.
-2. Creates the Flash game folders.
-3. Registers a **Flash Games** system in EmulationStation.
-4. Uses the current EmulationStation theme without overwriting it.
-5. Keeps the complete runtime inside the port folder.
+Nothing is downloaded. Native, Native Multifile, the cursor shim, profiles, scripts and theme artwork are bundled.
 
-If Flash Games does not appear immediately, restart EmulationStation.
+## Final layout
 
-**Internet is not required.** The ARM64 runtime and required project files are already included in the release.
-
-### PortMaster
-
-The repository uses a PortMaster-style port layout so it can be tested across supported handheld environments and prepared for a future PortMaster submission. Until an official catalog entry exists, use the manual/offline release.
-
-## Folder layout after setup
-
-The player only needs to care about the game folders created under the ROM root:
+A clean installation looks like this:
 
 ```text
-ROMs/
-├── flash/
-└── flash_data/
+ROMS/
+├── flash/                         Only .swf games
+├── flash_data/                    Multi-file assets
+├── ports_scripts/
+│   └── Ruffle Handheld.sh
+└── ports/
+    └── rufflehandheld/
+        ├── runtime/               Core and path adapters
+        ├── profiles/
+        │   └── custom/            User mappings preserved across updates
+        ├── profile-maker.html     Visual offline profile maker
+        ├── logs/                  One file per launched game
+        ├── theme/                 Chef and Adobe Flash logo
+        ├── licenses/
+        ├── setup.sh
+        └── core-install.sh
 ```
 
-The installed runtime stays inside Ports:
+No `flash_runtime/`, `flash_profiles/` or `ports/ruffle_r36s/` directories are created at the ROM root. EmuELEC runs the adapter installed directly under `ports/rufflehandheld/runtime/`. To keep the v0.7.7 core unchanged, the entrypoint creates a compatibility view under `/tmp` for each game and removes it afterward.
+
+## Games
+
+Normal games go directly in `flash/`:
 
 ```text
-Ports/
-├── Ruffle Handheld.sh
-└── rufflehandheld/
-    ├── bin/
-    ├── runtime/
-    ├── profiles/
-    ├── assets/
-    ├── licenses/
-    └── logs/
+flash/Fancy Pants.swf
+flash/dadnme.swf
 ```
 
-Users do not need to create or move runtime folders manually.
-
-## Adding games
-
-### Single-file games
-
-Put the `.swf` directly in `flash/`:
+For multi-file games, the base names must match:
 
 ```text
-ROMs/
-└── flash/
-    └── Fancy Pants.swf
+flash/Garfield.swf
+flash_data/Garfield.files/
 ```
 
-EmulationStation will list the SWF as a Flash game.
+EmulationStation scans only `flash/` and only `.swf .SWF`. `flash_data/` is outside the system path, so asset folders are not displayed as extra games.
 
-### Multi-file games
-
-Some Flash games need XML files, extra SWFs, images, sounds or other resources beside the main movie.
-
-Keep the main SWF in `flash/` and place its companion data in `flash_data/<game name>.files/`:
-
-```text
-ROMs/
-├── flash/
-│   └── Garfield.swf
-└── flash_data/
-    └── Garfield.files/
-        ├── data.xml
-        ├── images/
-        ├── sounds/
-        └── other game files
-```
-
-The base name must match:
-
-```text
-Garfield.swf
-Garfield.files/
-```
-
-Keeping the companion folder under `flash_data/` prevents EmulationStation from showing asset folders as separate games.
-
-For compatibility with older setups, the launcher can also detect a `<game>.files` directory next to the SWF.
-
-Do not submit copyrighted SWFs or game assets to this repository.
+During an update, an old `flash/Garfield.files/` folder is moved to `flash_data/Garfield.files/`. If the destination already exists, data is merged and the original is preserved under `rufflehandheld/migrated/` before it is removed from the visible game list.
 
 ## Controller profiles
 
-Profiles are installed with Ruffle Handheld and live here on the handheld:
+All profiles live under:
 
 ```text
-Ports/rufflehandheld/profiles/
+ports/rufflehandheld/profiles/
 ```
 
-In the repository, the same files are stored at:
+Profiles for Fancy Pants, Dad 'n Me, Papa's Pizzeria, Henry Stickmin, Super Mario 63, Bad Ice-Cream 3, Garfield, The World's Hardest Game, Bejeweled 2, We Dancing Online, Ultimate Flash Sonic, Final Fantasy Sonic X5, Minecraft Tower Defense and Super Smash Flash 2 are included. Mouse-only games use A as click through `gptokeyb2`; hybrid games reserve R1 for cursor clicks.
 
-```text
-port/rufflehandheld/rufflehandheld/profiles/
-```
+The new profiles use these main handheld controls:
 
-There is only one source copy of each profile.
-
-When a game launches, Ruffle Handheld normalizes the SWF filename, searches for a matching `.profile`, checks its aliases, and falls back to `default.profile` if no dedicated profile exists.
-
-Included profiles currently cover games such as Fancy Pants, Dad 'n Me, Papa's Pizzeria, Henry Stickmin, Super Mario 63, Bad Ice-Cream 3, Garfield and The World's Hardest Game.
-
-### Creating a profile
-
-Copy:
-
-```text
-port/rufflehandheld/rufflehandheld/profiles/template.profile
-```
-
-Rename the copy to a normalized game name, for example:
-
-```text
-alien-hominid.profile
-```
-
-A profile uses plain `key=value` entries:
-
-```text
-name=Alien Hominid
-aliases=alien-hominid|alienhominid
-mouse_click=r1
-native_a_mode=keyboard
-
-dpad_up=38
-dpad_down=40
-dpad_left=37
-dpad_right=39
-south=32
-east=90
-west=88
-north=67
-start=13
-select=27
-left_trigger=16
-right_trigger=none
-```
-
-Keyboard values use Flash/Windows virtual key codes. Use `none` to disable a mapping.
-
-Physical controller mapping in the bundled frontend:
-
-| Physical control | Profile field |
+| Game | Handheld controls |
 | --- | --- |
-| D-pad | `dpad_up`, `dpad_down`, `dpad_left`, `dpad_right` |
-| A | `south` |
-| B | `east` |
-| X | `west` |
-| Y | `north` |
-| Start | `start` |
-| Select/Back | `select` |
-| L1 | `left_trigger` |
-| Extra/internal trigger route | `right_trigger` |
+| Bejeweled 2 | Right stick = cursor; A = click |
+| We Dancing Online | D-pad = arrows; B = Space; X = X; Y = C; Start = Enter; Select = Escape; L1 = Shift; R1 = click |
+| Ultimate Flash Sonic | D-pad = arrows; A = jump/Spin Dash; Start = pause; R1 = menu click |
+| Final Fantasy Sonic X5 | Right stick = cursor; A = select |
+| Minecraft Tower Defense | Right stick = cursor; A = dig, build and select |
+| Super Smash Flash 2 | D-pad = WASD; A = attack; B = special; X = grab; Y = shield; Start = start; Select = pause; L1 = taunt; R1 = menu click |
 
-`mouse_click` selects the handheld button used as an additional left mouse click when `gptokeyb2` or a compatible helper is available. `r1` is the normal project default.
+### Visual remapping
 
-`native_a_mode` controls how physical A is handled by the frozen console frontend:
+The source tree also includes `tools/profile-maker.html`, a bilingual offline control editor for creating or editing `.profile` files from a normal PC or phone browser. The release keeps the same editor at `ports/rufflehandheld/profile-maker.html`, so users do not need Python or any online service to remap controls.
 
-- `keyboard` — use A as the profile's keyboard action for keyboard/hybrid games.
-- `native` — keep the frontend's native A behavior, useful for mouse-only games.
-- `disabled` — do not give A a Ruffle action.
+Users do not need to learn numeric keyboard codes or edit `config.ron`:
 
-When `native_a_mode=keyboard`, part of the A routing is handled internally by the launcher. Contributors should normally set the intended action with `south=` and leave `right_trigger=none` unless they understand the internal routing.
+1. Open `ports/rufflehandheld/profile-maker.html` in any PC or phone browser. It works offline and its entire interface can switch between English and Español.
+2. Enter the exact `.swf` filename and choose an action for each button.
+3. Download the `.profile` and copy it into `ports/rufflehandheld/profiles/custom/`.
+4. Launch the game normally; setup does not need to be run again.
 
-## Mouse controls
+The editor can also load an existing `.profile` for changes. Files under `profiles/custom/` take priority over bundled profiles and setup never deletes that folder. A button selected for mouse click is prevented from sending a keyboard key at the same time, avoiding duplicate actions.
 
-The bundled console frontend provides the mouse cursor behavior used by the project. Additional click mapping can use PortMaster's `gptokeyb2` when it exists on the target system.
+Updates automatically migrate `flash_profiles/*.profile` into the new directory. A user-modified legacy profile wins, while the bundled profile it replaces is backed up under `rufflehandheld/migrated/`.
 
-A mouse-only game may intentionally keep physical A as the native click. A hybrid game can instead use A as a keyboard action and R1 as click through its profile.
+## CFW and frontend adapters
 
-If a device/CFW has different controller behavior, report the exact device and firmware so the profile or platform handling can be adjusted without breaking other handhelds.
+| Detected CFW | Flash registration | Automatic reload | Status |
+| --- | --- | --- | --- |
+| EmuELEC | Main configs and `es_systems_flash.cfg` in `.config` and `.emulationstation` | Verified `emustation.service` restart | Verified |
+| ArkOS | Existing writable `es_systems.cfg` only | Manual | Unverified |
+| ROCKNIX / AmberELEC | Existing config under `/storage` only | Manual | Unverified |
+| Knulli / Batocera | `es_systems_rufflehandheld.cfg` overlay | Manual | Unverified |
+| muOS | Detected without pretending it uses EmulationStation | Unavailable | Adapter pending |
+| Other ARM64 Linux | Existing writable config discovery | Manual | Unverified |
 
-## Performance mode
+When PortMaster exists, its `control.txt` stays authoritative. Without PortMaster, the bundled offline adapter is used. An unknown CFW without a safe adapter gets a clear error instead of a blind write or false success.
 
-Ruffle Handheld includes conservative runtime optimizations used during gameplay:
+On EmuELEC, the registered system is equivalent to this (ArkOS/Knulli adapters use their frontends' `%ROM%` token):
 
-- Requests `performance` governors for supported CPU/GPU/memory nodes when the system exposes them.
-- Restores the previous governor values when the game exits.
-- Uses a symlink for the temporary main SWF when possible instead of copying the whole file.
-- Falls back safely when a specific optimization is unavailable.
-
-This is **not overclocking**. No new clocks or voltages are added by the project.
-
-## EmulationStation themes
-
-Ruffle Handheld does not replace or edit the user's theme files.
-
-During setup it checks the active theme:
-
-- If the theme already contains a `flash` system entry, it uses `flash`.
-- Otherwise the Flash system uses the theme's `arcade` entry as a fallback.
-
-This keeps Flash visually consistent with the selected EmulationStation theme without shipping a replacement theme.
-
-## Compatibility tracker
-
-The official community compatibility database is **`Compatibility.xlsx`** in the repository root. It tracks game status, performance, controls, input type, device, CFW/OS, architecture, audio, profile information and test notes.
-
-Compatibility and performance are kept separate because a game can open correctly and still run slowly.
-
-Compatibility status:
-
-- `Perfect` — no meaningful issue found during the reported test.
-- `Playable` — game can be played with minor issues.
-- `Partial` — important functionality is missing or broken.
-- `Boots` — reaches some game content but is not considered playable.
-- `Doesn't open` — launcher/runtime does not reach the game.
-- `Black screen` — runtime opens but game output remains black.
-- `Crash` — runtime or game exits unexpectedly.
-- `Needs assets` — main SWF opens but required companion files are missing.
-- `Untested` — no confirmed community result yet.
-
-Performance is tracked separately as `High`, `Medium`, `Low`, `Unknown` or `N/A`.
-
-Different devices and CFWs can have different results for the same game, so multiple test rows can coexist. Community members normally **do not edit the spreadsheet directly**: submit a **Game compatibility report** from GitHub Issues and a maintainer will review the result and add it to the tracker.
-
-## Contributing
-
-You do not need Git knowledge to help.
-
-Open **Issues → New issue** and choose one of the built-in forms:
-
-### Game compatibility report
-
-Use this after testing a game. The form asks for:
-
-- Game and SWF filename.
-- Ruffle Handheld version.
-- Device.
-- CFW / OS.
-- SoC / architecture.
-- Compatibility status.
-- Performance.
-- Controls.
-- Audio.
-- Notes and logs when relevant.
-
-Submit separate reports when the same game behaves differently on different devices or CFWs.
-
-### Control profile submission
-
-Use this to propose or improve controls. Include:
-
-- Game and SWF filename.
-- Device / CFW used for testing.
-- Original keyboard/mouse controls.
-- Proposed handheld mapping.
-- Actions actually verified in-game.
-
-### Runtime bug report
-
-Use this for project-level problems such as setup, launching, cursor behavior, controls, performance regressions, multi-file loading or theme integration.
-
-### Pull Requests
-
-Contributors who prefer Git can edit the same files directly:
-
-```text
-Profiles: port/rufflehandheld/rufflehandheld/profiles/
-Runtime:  port/rufflehandheld/rufflehandheld/runtime/
+```xml
+<system>
+  <name>flash</name>
+  <fullname>Adobe Flash Player</fullname>
+  <path>DETECTED_ROM_ROOT/flash</path>
+  <extension>.swf .SWF</extension>
+  <command>/bin/bash DETECTED_ROM_ROOT/ports/rufflehandheld/runtime/es-launch.sh "%ROM_RAW%"</command>
+  <platform>flash</platform>
+  <theme>flash</theme>
+</system>
 ```
 
-Keep changes focused. A new game control contribution normally needs only its `.profile`. Compatibility results should normally be submitted through the GitHub compatibility form so the tracker stays consistent. Do not add game SWFs or copyrighted assets.
+On EmuELEC, setup synchronizes both main configurations and both `es_systems_flash.cfg` drop-ins because the frontend may prioritize the latter. Re-running setup replaces only the previous Flash entry. Other systems are preserved and Flash is not duplicated.
 
-## Repository layout
+## EmulationStation theme
 
-```text
-Ruffle-Handheld/
-├── .github/
-│   ├── ISSUE_TEMPLATE/        Community contribution forms
-│   └── workflows/             Release automation
-├── port/
-│   └── rufflehandheld/        Complete installable port source
-├── tools/
-│   └── build_release.py       Maintainer release packager
-├── Compatibility.xlsx        Community compatibility tracker
-├── README.md
-├── README.es.md
-├── LICENSE
-├── VERSION
-├── .gitattributes
-└── .gitignore
-```
+Bundled artwork:
 
-The installable release contains only:
+- `theme/system.png`: full Adobe Flash Player logo.
+- `theme/background_icon.png`: transparent chef background.
 
-```text
-Ruffle Handheld.sh
-rufflehandheld/
-```
+If the active theme already has `flash/theme.xml`, it is kept completely unchanged. Otherwise, if a writable `arcade/theme.xml` layout is available, setup creates only the missing `flash/` section and copies its layout, logo and chef. Existing Flash files are never overwritten. If the theme cannot be extended safely, the Arcade theme tag is used as a fallback.
 
-`.github`, `Compatibility.xlsx`, `tools` and repository metadata are not copied to the handheld.
+## Frozen known-good runtime
 
-## Building the offline ZIP
+Release building checks SHA-256 and stops if any frozen v0.7.7 component changes accidentally:
 
-Normal players and contributors do **not** run the build script.
+- ARM64 Native and Native Multifile binaries;
+- cursor shim and `LD_PRELOAD` behavior;
+- performance helper;
+- logo and chef artwork.
 
-GitHub Actions can build the offline package automatically. Maintainers who want to build it locally can run:
+The binaries were not updated. Launchers, profiles and profile resolution are intentionally versioned in v0.8.21; bundled profiles contain no `native_a_mode`, old configurations are converted compatibly, and `profiles/custom/` keeps priority. Their hashes are pinned by the release build.
+
+## Logs
+
+Each game creates only its own file:
 
 ```text
-Windows:  py tools\build_release.py
-Linux:    python3 tools/build_release.py
-macOS:    python3 tools/build_release.py
+ports/rufflehandheld/logs/Fancy_Pants.swf.log
+ports/rufflehandheld/logs/Garfield.swf.log
 ```
 
-It uses only the Python standard library and generates `releases/rufflehandheld.zip`.
+The file is overwritten when the same game is launched again, so repeated attempts do not create a growing log collection. It contains the received path, profile, backend, Native or Multifile output, memory data and any exit-137 diagnostics. Auxiliary logs from previous releases are removed automatically during an update.
 
-## Troubleshooting
+## Compatibility and contributions
 
-**Flash Games does not appear in EmulationStation**  
-Restart EmulationStation after running Ruffle Handheld setup once. If it still does not appear, report the CFW and location of its `es_systems.cfg`.
+`Compatibility.xlsx` is the project's maintained compatibility table. `.github/ISSUE_TEMPLATE/` contains forms for:
 
-**A game does not appear**  
-Confirm the main game file ends in `.swf` and is inside the created `flash/` folder.
+- Game compatibility report
+- Control profile submission
+- Runtime bug report
 
-**A multi-file game opens but assets are missing**  
-Check that the sidecar folder uses the exact main SWF base name: `Game.swf` + `flash_data/Game.files/`.
+## Building a Release
 
-**R1 click does not work on a specific CFW**  
-Report whether that system provides PortMaster/gptokeyb2 and include the device/CFW. Native A click behavior may still work in mouse-only profiles.
+Normal users do not need Python. Maintainers and GitHub Actions can run:
 
-**Black screen or crash**  
-Open a Runtime bug report or Game compatibility report and attach the logs from `Ports/rufflehandheld/logs/` when available.
-
-**A controller profile is wrong on one handheld**  
-Do not assume the profile is globally wrong. Report the device and CFW because controller mappings can differ between environments.
-
-## Third-party components and legal
-
-Ruffle Handheld is a launcher/integration project. Flash emulation is provided by Ruffle-derived components bundled for the target architecture.
-
-- Ruffle: https://ruffle.rs/
-- ruffle4consoles: https://github.com/Hexadecinull/ruffle4consoles
-- PortMaster / gptokeyb2: https://github.com/PortsMaster/gptokeyb2
-
-Third-party notices required by the distributed runtime are included inside:
-
-```text
-port/rufflehandheld/rufflehandheld/licenses/
+```bash
+python3 tools/build_release.py
 ```
 
-Ruffle Handheld does not distribute Flash games. Users and contributors are responsible for ensuring they have the right to use any SWFs or external assets they add.
+The result is `releases/Ruffle-Handheld-vX.X.X-OFFLINE.zip` and contains only `Ruffle Handheld.sh` and `rufflehandheld/`, following the standard port format.
+
+## Automated-test boundary
+
+Tests on a non-ARM host validate clean install, update, XML, duplicates, spaces, permissions, LF, hashes, profiles, theme integration and Simple/Multi-file flow up to binary execution. The ARM64 binary is not claimed as executed on x86_64; rendering, audio, cursor, physical controls and the real frontend reload still require an EmuELEC/RK3326 console test.
+
+## Legal
+
+Ruffle Handheld does not include Flash games or the Adobe Flash Player executable. Users provide legally obtained SWFs. Runtime and integration licenses are under `rufflehandheld/licenses/` and in `LICENSE`.

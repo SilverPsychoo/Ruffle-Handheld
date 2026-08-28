@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.17 core installer.
+# Ruffle Handheld v0.8.21 core installer.
 # Registers the frozen v0.7.7 core in-place inside the Ruffle Handheld bundle.
 
 ROMROOT="$1"
@@ -16,9 +16,9 @@ ENGINE="$APP_DIR/runtime"
 LOGDIR="$APP_DIR/logs"
 MIGRATED="$APP_DIR/migrated"
 STATE_DIR="${RUFFLE_INSTALL_STATE_DIR:-$APP_DIR/.install-state}"
-mkdir -p "$FLASHDIR" "$DATADIR" "$PROFILEDIR" "$LOGDIR" "$STATE_DIR" || exit 5
+mkdir -p "$FLASHDIR" "$DATADIR" "$PROFILEDIR/custom" "$LOGDIR" "$STATE_DIR" || exit 5
 
-# v0.8.17 keeps only one persistent log per game. Remove diagnostic files and
+# v0.8.21 keeps only one persistent log per game. Remove diagnostic files and
 # duplicate per-backend logs left by older releases; games and profiles are not
 # touched. Current per-game logs directly under logs/ are preserved.
 for obsolete_log in \
@@ -49,7 +49,7 @@ for migrated_log in \
     [ -f "$migrated_log" ] && rm -f "$migrated_log"
 done
 
-echo "=== Core install: v0.7.7 runtime under v0.8.17 installer ==="
+echo "=== Core install: v0.7.7 binaries under v0.8.21 installer ==="
 echo "ROM root: $ROMROOT"
 echo "Application: $APP_DIR"
 echo "CFW adapter: $CFW_NAME"
@@ -218,6 +218,7 @@ for required in \
     "$ENGINE/core/native_v020/ruffle-native.aarch64" \
     "$ENGINE/core/native_multifile/Ruffle-Native-Multifile-Launch.sh" \
     "$ENGINE/core/native_multifile/ruffle-native-multifile.aarch64" \
+    "$APP_DIR/profile-maker.html" \
     "$APP_DIR/theme/background_icon.png" \
     "$APP_DIR/theme/system.png"; do
     [ -f "$required" ] || { echo "ERROR: bundled file missing: $required"; exit 13; }
@@ -520,8 +521,9 @@ for executable in "$ENGINE/entrypoint.sh" "$ENGINE/es-launch.sh" "$ENGINE/native
 done
 [ -d "$FLASHDIR" ] && [ -d "$DATADIR" ] || exit 27
 [ -f "$PROFILEDIR/default.profile" ] || exit 28
+[ -d "$PROFILEDIR/custom" ] || exit 28
 [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
-printf '%s\n' "0.8.17" > "$APP_DIR/installed-version"
+printf '%s\n' "0.8.21" > "$APP_DIR/installed-version"
 sync
 echo "Core installation complete and verified."
 exit 0

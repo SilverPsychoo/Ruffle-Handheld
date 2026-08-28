@@ -98,23 +98,19 @@ PROFILE_NAME="$(rh_profile_display_name "$PROFILE")"
 echo "Control profile: $PROFILE_NAME"
 echo "Profile file: $PROFILE"
 
-# Per-profile physical-A policy for the frozen frontend.
-# native  : keep stock SDL A/South (used by mouse-only games).
-# keyboard: remove logical A/South, route the physical A binding through
-#           SDL RightShoulder -> Ruffle RightTrigger, then config.ron maps it
-#           to the requested keyboard key. This prevents the duplicate A-click.
-# disabled: remove logical A/South entirely.
-rh_apply_native_a_policy() {
-    mode="$1"; mapping="$2"
+# Remove the frozen frontend's stock A/South click. If the profile assigns a
+# keyboard key to A, route the physical binding through SDL RightShoulder;
+# config.ron then exposes it as Ruffle RightTrigger. Otherwise A remains
+# available only to gptokeyb2 when mouse_click=a.
+rh_route_profile_a() {
+    route="$1"; mapping="$2"
     [ -n "$mapping" ] || { printf '%s' "$mapping"; return 0; }
-    [ "$mode" = "native" ] && { printf '%s' "$mapping"; return 0; }
 
     oldifs="$IFS"; IFS=','
-    a_bind=""; rshoulder_bind=""
+    a_bind=""
     for field in $mapping; do
         case "$field" in
             a:*) a_bind="${field#a:}" ;;
-            rightshoulder:*) rshoulder_bind="${field#rightshoulder:}" ;;
         esac
     done
 
@@ -126,27 +122,28 @@ rh_apply_native_a_policy() {
         case "$field" in
             a:*) continue ;;
             rightshoulder:*)
-                if [ "$mode" = "keyboard" ]; then field="rightshoulder:$a_bind"; else continue; fi
+                if [ "$route" = "keyboard" ]; then field="rightshoulder:$a_bind"; else continue; fi
                 ;;
         esac
         if [ "$first" -eq 1 ]; then out="$field"; first=0; else out="$out,$field"; fi
     done
     IFS="$oldifs"
 
-    # Some DB rows may not define rightshoulder. Add it when keyboard routing.
-    if [ "$mode" = "keyboard" ]; then
+    # Some DB rows may not define rightshoulder. Add it for a keyboard action.
+    if [ "$route" = "keyboard" ]; then
         case ",$out," in *,rightshoulder:*) ;; *) out="$out,rightshoulder:$a_bind" ;; esac
     fi
     printf '%s' "$out"
 }
 
-NATIVE_A_MODE="$(rh_profile_value "$PROFILE" "$DEFAULT_PROFILE" native_a_mode 2>/dev/null || true)"
-[ -n "$NATIVE_A_MODE" ] || NATIVE_A_MODE="keyboard"
+A_KEYCODE="$(rh_profile_value "$PROFILE" "$DEFAULT_PROFILE" south 2>/dev/null || true)"
+[ "$(rh_profile_raw_value "$PROFILE" native_a_mode 2>/dev/null || true)" = "native" ] && A_KEYCODE="none"
+A_ROUTE="none"
+rh_valid_keycode "$A_KEYCODE" && A_ROUTE="keyboard"
 if [ -n "${sdl_controllerconfig:-}" ]; then
     ORIGINAL_SDL_CONTROLLERCONFIG="$sdl_controllerconfig"
-    sdl_controllerconfig="$(rh_apply_native_a_policy "$NATIVE_A_MODE" "$sdl_controllerconfig")"
+    sdl_controllerconfig="$(rh_route_profile_a "$A_ROUTE" "$sdl_controllerconfig")"
 fi
-echo "Native A mode: $NATIVE_A_MODE" 
 rh_write_config_ron "$PROFILE" "$DEFAULT_PROFILE" "$SESSION/ruffle_data/config.ron" "movie.swf" || { echo "ERROR: could not build config.ron"; exit 7; }
 if [ "${RUFFLE_DEBUG:-0}" = "1" ]; then
     echo "Generated native gamepad map:"

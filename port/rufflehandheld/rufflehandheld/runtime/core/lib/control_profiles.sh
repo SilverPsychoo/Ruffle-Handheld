@@ -35,18 +35,30 @@ rh_profile_value() {
 
 rh_resolve_profile() {
     profiledir="$1"; game_name="$2"; norm="$(rh_normalize_name "$game_name")"
-    if [ -f "$profiledir/$norm.profile" ]; then printf '%s\n' "$profiledir/$norm.profile"; return 0; fi
-    for file in "$profiledir"/*.profile; do
-        [ -f "$file" ] || continue
-        [ "$(basename "$file")" = "default.profile" ] && continue
-        [ "$(basename "$file")" = "template.profile" ] && continue
-        aliases="$(rh_profile_raw_value "$file" aliases 2>/dev/null || true)"
-        oldifs="$IFS"; IFS='|'
-        for alias in $aliases; do
-            alias="$(rh_normalize_name "$alias")"
-            if [ -n "$alias" ] && [ "$alias" = "$norm" ]; then IFS="$oldifs"; printf '%s\n' "$file"; return 0; fi
+    # User-created profiles always win. The visual profile maker stores them
+    # under profiles/custom/ so a release update can replace bundled profiles
+    # without touching the user's mappings.
+    for searchdir in "$profiledir/custom" "$profiledir"; do
+        if [ -f "$searchdir/$norm.profile" ]; then
+            printf '%s\n' "$searchdir/$norm.profile"
+            return 0
+        fi
+        for file in "$searchdir"/*.profile; do
+            [ -f "$file" ] || continue
+            [ "$(basename "$file")" = "default.profile" ] && continue
+            [ "$(basename "$file")" = "template.profile" ] && continue
+            aliases="$(rh_profile_raw_value "$file" aliases 2>/dev/null || true)"
+            oldifs="$IFS"; IFS='|'
+            for alias in $aliases; do
+                alias="$(rh_normalize_name "$alias")"
+                if [ -n "$alias" ] && [ "$alias" = "$norm" ]; then
+                    IFS="$oldifs"
+                    printf '%s\n' "$file"
+                    return 0
+                fi
+            done
+            IFS="$oldifs"
         done
-        IFS="$oldifs"
     done
     printf '%s\n' "$profiledir/default.profile"
 }
@@ -64,16 +76,14 @@ rh_valid_keycode() {
 # Build config.ron using ONLY the button names accepted by the frozen frontend.
 # Known-good names are inherited from the original working v0.5.x config.
 # Frozen frontend uses lowercase/hyphenated GamepadButton names.
-# Physical A is GamepadButton::South; including "south" overrides its default
-# behavior for hybrid/keyboard games. Omit it in mouse-only profiles so A keeps
-# the native click behavior there.
+# Physical A is removed from its stock South binding before Ruffle starts.
+# When a profile declares a numeric `south` key, the launcher routes physical A
+# through RightTrigger and this config maps it to that key. With `south=none`, A
+# is available only to an explicit mouse_click helper assignment.
 rh_write_config_ron() {
     profile="$1"; defaults="$2"; output="$3"; swf_name="${4:-movie.swf}"
     [ -f "$defaults" ] || return 2
     [ -f "$profile" ] || profile="$defaults"
-
-    native_a_mode="$(rh_profile_value "$profile" "$defaults" native_a_mode 2>/dev/null || true)"
-    [ -n "$native_a_mode" ] || native_a_mode="keyboard"
 
     emit_map() {
         ron_name="$1"; profile_key="$2"
@@ -89,19 +99,18 @@ rh_write_config_ron() {
         emit_map 'dpad-left' dpad_left
         emit_map 'dpad-right' dpad_right
 
-        # The frozen frontend treats physical A/South as a native mouse click in
-        # addition to gamepad_config. For keyboard-mode profiles the launcher
-        # reroutes physical A through SDL RightShoulder, which this frontend
-        # exposes as GamepadButton::RightTrigger. Map that routed button to the
-        # profile's requested South keycode. Mouse-only profiles keep native A.
-        if [ "$native_a_mode" = "keyboard" ]; then
-            val="$(rh_profile_value "$profile" "$defaults" south 2>/dev/null || true)"
-            rh_valid_keycode "$val" && printf '        "right-trigger": %s,\n' "$val"
-        elif [ "$native_a_mode" = "native" ]; then
-            emit_map 'south' south
-            emit_map 'right-trigger' right_trigger
+        # The frozen frontend treats physical A/South as a native click. The
+        # launcher always removes that raw binding. A numeric South action is
+        # exposed through the safe RightTrigger route instead.
+        legacy_mode="$(rh_profile_raw_value "$profile" native_a_mode 2>/dev/null || true)"
+        if [ "$legacy_mode" = "native" ]; then
+            val="none"
         else
-            # disabled: omit South entirely so A has no Ruffle action.
+            val="$(rh_profile_value "$profile" "$defaults" south 2>/dev/null || true)"
+        fi
+        if rh_valid_keycode "$val"; then
+            printf '        "right-trigger": %s,\n' "$val"
+        else
             emit_map 'right-trigger' right_trigger
         fi
 

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.17 offline installer wrapper.
+# Ruffle Handheld v0.8.21 offline installer wrapper.
 
-VERSION="0.8.17"
+VERSION="0.8.21"
 APP_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
 PORTS_DIR="${1:-$(dirname "$APP_DIR")}" 
 PORTS_DIR="$(CDPATH= cd -- "$PORTS_DIR" 2>/dev/null && pwd -P)" || {
@@ -216,6 +216,7 @@ echo "Games: $ROMROOT/flash"
 echo "Multi-file data: $ROMROOT/flash_data"
 echo "Runtime: $APP_DIR/runtime"
 echo "Control profiles: $APP_DIR/profiles"
+echo "Visual profile maker: $APP_DIR/profile-maker.html"
 echo "Per-game logs: $APP_DIR/logs"
 if [ "$RELOAD_OK" -eq 1 ]; then
     echo "Frontend status: ready/reload requested successfully."
