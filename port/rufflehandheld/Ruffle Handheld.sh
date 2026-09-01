@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.21 universal installer/repair launcher.
+# Ruffle Handheld v0.8.26 universal installer/repair launcher.
 # Some CFWs export PortMaster launchers to ports_scripts while keeping the
 # application data in ports. Resolve the complete application, not merely a
 # same-named directory which may contain only stale logs.

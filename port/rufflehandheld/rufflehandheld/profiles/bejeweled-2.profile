@@ -2,6 +2,7 @@
 # Right stick moves the cursor; A clicks. / El stick derecho mueve el cursor; A hace clic.
 name=Bejeweled 2
 aliases=bejeweled2|bejeweled-2-deluxe|bejeweled2deluxe|bejeweled-2-action
+mouse_mode=mouse
 mouse_click=a
 
 dpad_up=none

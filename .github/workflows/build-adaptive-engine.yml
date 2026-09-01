@@ -1,0 +1,52 @@
+name: Build adaptive ARM64 engine
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04-arm
+    container: ubuntu:20.04
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential ca-certificates curl default-jre-headless file git \
+            libasound2-dev libfontconfig1-dev libgl1-mesa-dev libgles2-mesa-dev \
+            libsdl2-dev libssl-dev libudev-dev pkg-config
+
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        shell: bash
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Build patched ruffle4consoles
+        shell: bash
+        run: |
+          git clone https://github.com/Hexadecinull/ruffle4consoles.git engine-src
+          git -C engine-src checkout a12f2a9
+          git -C engine-src apply --unidiff-zero "$GITHUB_WORKSPACE/engine/patches/ruffle4consoles-v0.8.26.patch"
+          cargo build --manifest-path engine-src/Cargo.toml --release --locked
+
+      - name: Verify and stage executable
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp engine-src/target/release/ruffle4consoles dist/ruffle-native-adaptive.aarch64
+          strip --strip-unneeded dist/ruffle-native-adaptive.aarch64
+          file dist/ruffle-native-adaptive.aarch64
+          readelf -h dist/ruffle-native-adaptive.aarch64 | grep -E 'Class:|Machine:'
+          readelf -Ws dist/ruffle-native-adaptive.aarch64 \
+            | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -n 1 | tee dist/max-glibc.txt
+          sha256sum dist/ruffle-native-adaptive.aarch64 | tee dist/SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ruffle-native-adaptive-aarch64
+          path: dist/
+          if-no-files-found: error

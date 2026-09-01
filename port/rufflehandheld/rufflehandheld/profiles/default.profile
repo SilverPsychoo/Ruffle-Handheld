@@ -2,6 +2,9 @@
 # Hybrid default: A=Space and R1 is the mouse click.
 name=Generic Flash
 aliases=generic|default
+engine=auto
+force_scale=movie
+mouse_mode=gamepad
 mouse_click=r1
 
 dpad_up=38

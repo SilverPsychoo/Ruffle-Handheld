@@ -1,6 +1,6 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.21 core installer.
-# Registers the frozen v0.7.7 core in-place inside the Ruffle Handheld bundle.
+# Ruffle Handheld v0.8.26 core installer.
+# Registers the stable v0.7.7 core plus the opt-in adaptive ARM64 core.
 
 ROMROOT="$1"
 APP_DIR="$2"
@@ -18,7 +18,7 @@ MIGRATED="$APP_DIR/migrated"
 STATE_DIR="${RUFFLE_INSTALL_STATE_DIR:-$APP_DIR/.install-state}"
 mkdir -p "$FLASHDIR" "$DATADIR" "$PROFILEDIR/custom" "$LOGDIR" "$STATE_DIR" || exit 5
 
-# v0.8.21 keeps only one persistent log per game. Remove diagnostic files and
+# v0.8.26 keeps only one persistent log per game. Remove diagnostic files and
 # duplicate per-backend logs left by older releases; games and profiles are not
 # touched. Current per-game logs directly under logs/ are preserved.
 for obsolete_log in \
@@ -49,7 +49,7 @@ for migrated_log in \
     [ -f "$migrated_log" ] && rm -f "$migrated_log"
 done
 
-echo "=== Core install: v0.7.7 binaries under v0.8.21 installer ==="
+echo "=== Core install: stable v0.7.7 + adaptive ARM64 under v0.8.26 installer ==="
 echo "ROM root: $ROMROOT"
 echo "Application: $APP_DIR"
 echo "CFW adapter: $CFW_NAME"
@@ -212,7 +212,9 @@ for required in \
     "$ENGINE/core/launch.sh" \
     "$ENGINE/es-launch.sh" \
     "$ENGINE/core/lib/control_profiles.sh" \
+    "$ENGINE/core/lib/engine.sh" \
     "$ENGINE/core/lib/performance.sh" \
+    "$ENGINE/core/native_adaptive/ruffle-native-adaptive.aarch64" \
     "$ENGINE/core/native_v020/Ruffle-Native-Launch.sh" \
     "$ENGINE/core/native_v020/libruffle_cursorfix.aarch64.so" \
     "$ENGINE/core/native_v020/ruffle-native.aarch64" \
@@ -224,7 +226,8 @@ for required in \
     [ -f "$required" ] || { echo "ERROR: bundled file missing: $required"; exit 13; }
 done
 chmod +x "$ENGINE/entrypoint.sh" "$ENGINE/es-launch.sh" "$ENGINE/native-adapter.sh" "$ENGINE/multifile-adapter.sh" \
-    "$ENGINE/core/launch.sh" "$ENGINE/core/lib/performance.sh" \
+    "$ENGINE/core/launch.sh" "$ENGINE/core/lib/engine.sh" "$ENGINE/core/lib/performance.sh" \
+    "$ENGINE/core/native_adaptive/ruffle-native-adaptive.aarch64" \
     "$ENGINE/core/native_v020/Ruffle-Native-Launch.sh" \
     "$ENGINE/core/native_v020/ruffle-native.aarch64" \
     "$ENGINE/core/native_multifile/Ruffle-Native-Multifile-Launch.sh" \
@@ -233,6 +236,58 @@ echo "  runtime stays in-place; no duplicate binary tree was created"
 
 xml_escape() {
     printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+
+can_replace_config() {
+    target="$1"
+    if [ -e "$target" ]; then
+        [ -f "$target" ] || return 1
+        [ -w "$target" ] && return 0
+    else
+        [ -d "$(dirname "$target")" ] && [ -w "$(dirname "$target")" ] && return 0
+    fi
+    command -v sudo >/dev/null 2>&1 || return 1
+    sudo -n true >/dev/null 2>&1 || return 1
+    if [ -e "$target" ]; then
+        sudo -n test -w "$target" >/dev/null 2>&1
+    else
+        sudo -n test -w "$(dirname "$target")" >/dev/null 2>&1
+    fi
+}
+
+replace_config_file() {
+    source_file="$1"; target="$2"
+    if { [ -e "$target" ] && [ -w "$target" ]; } || \
+       { [ ! -e "$target" ] && [ -w "$(dirname "$target")" ]; }; then
+        cp "$source_file" "$target" || return 1
+        rm -f "$source_file"
+        return 0
+    fi
+    command -v sudo >/dev/null 2>&1 || return 1
+    sudo -n cp "$source_file" "$target" >/dev/null 2>&1 || return 1
+    rm -f "$source_file"
+}
+
+backup_config_once() {
+    target="$1"; backup="$target.rufflehandheld-backup"
+    [ -f "$target" ] || return 0
+    [ -e "$backup" ] && return 0
+    if [ -w "$(dirname "$target")" ]; then
+        cp -p "$target" "$backup"
+    else
+        command -v sudo >/dev/null 2>&1 && sudo -n cp -p "$target" "$backup" >/dev/null 2>&1
+    fi
+}
+
+create_empty_config() {
+    target="$1"; target_dir="$(dirname "$target")"
+    if [ ! -d "$target_dir" ]; then
+        mkdir -p "$target_dir" 2>/dev/null || \
+            { command -v sudo >/dev/null 2>&1 && sudo -n mkdir -p "$target_dir" >/dev/null 2>&1; } || return 1
+    fi
+    tmp="$STATE_DIR/empty-es-system-list.$$"
+    { echo '<?xml version="1.0"?>'; echo '<systemList>'; echo '</systemList>'; } > "$tmp" || return 1
+    replace_config_file "$tmp" "$target"
 }
 
 CFW_KEY="$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')"
@@ -250,18 +305,29 @@ if [ -z "$ES_CFG" ]; then
             ;;
         *knulli*|*batocera*)
             ES_ADAPTER="knulli-overlay-unverified"
-            ES_CFG="/userdata/system/configs/emulationstation/es_systems_rufflehandheld.cfg"
+            ES_CFG="${RUFFLE_KNULLI_ES_CONFIG:-/userdata/system/configs/emulationstation/es_systems_rufflehandheld.cfg}"
             ;;
-        *arkos*)
-            ES_ADAPTER="arkos-existing-unverified"
-            for candidate in /home/ark/.emulationstation/es_systems.cfg /etc/emulationstation/es_systems.cfg; do
-                [ -f "$candidate" ] && [ -w "$candidate" ] && { ES_CFG="$candidate"; break; }
+        *amberelec*|*351elec*)
+            # AmberELEC's base configuration is a read-only /etc symlink. Its
+            # EmulationStation fork explicitly loads es_systems_*.cfg from the
+            # user directory, which is /storage/.emulationstation.
+            ES_ADAPTER="amberelec-overlay-verified"
+            ES_CFG="${RUFFLE_AMBERELEC_ES_CONFIG:-/storage/.emulationstation/es_systems_rufflehandheld.cfg}"
+            ;;
+        *darkos*|*darkosre*|*arkos*)
+            ES_ADAPTER="arkos-family-existing"
+            for candidate in \
+                "${RUFFLE_ARKOS_SYSTEM_CONFIG:-/etc/emulationstation/es_systems.cfg}" \
+                "${RUFFLE_ARKOS_USER_CONFIG:-/home/ark/.emulationstation/es_systems.cfg}"; do
+                [ -f "$candidate" ] && can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
             done
             ;;
-        *rocknix*|*amberelec*|*351elec*)
+        *rocknix*)
             ES_ADAPTER="storage-existing-unverified"
-            for candidate in /storage/.config/emulationstation/es_systems.cfg /storage/.emulationstation/es_systems.cfg; do
-                [ -f "$candidate" ] && [ -w "$candidate" ] && { ES_CFG="$candidate"; break; }
+            for candidate in \
+                "${RUFFLE_STORAGE_ES_CONFIG:-/storage/.config/emulationstation/es_systems.cfg}" \
+                "${RUFFLE_STORAGE_LEGACY_ES_CONFIG:-/storage/.emulationstation/es_systems.cfg}"; do
+                [ -f "$candidate" ] && can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
             done
             ;;
         *muos*) ES_ADAPTER="muos-no-emulationstation-adapter" ;;
@@ -274,16 +340,15 @@ if [ -z "$ES_CFG" ]; then
         /storage/.config/emulationstation/es_systems.cfg \
         /storage/.emulationstation/es_systems.cfg \
         /userdata/system/configs/emulationstation/es_systems.cfg; do
-        [ -f "$candidate" ] && [ -w "$candidate" ] && { ES_CFG="$candidate"; break; }
+        [ -f "$candidate" ] && can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
     done
 fi
 
 if [ ! -f "$ES_CFG" ]; then
     case "$ES_ADAPTER" in
-        emuelec-verified|knulli-overlay-unverified|generic-existing)
+        emuelec-verified|knulli-overlay-unverified|amberelec-overlay-verified|generic-existing)
             [ -n "$ES_CFG" ] || { echo "ERROR: no EmulationStation configuration was found"; exit 21; }
-            mkdir -p "$(dirname "$ES_CFG")" || exit 21
-            { echo '<?xml version="1.0"?>'; echo '<systemList>'; echo '</systemList>'; } > "$ES_CFG" || exit 21
+            create_empty_config "$ES_CFG" || { echo "ERROR: could not create EmulationStation overlay: $ES_CFG"; exit 21; }
             ;;
         *)
             echo "ERROR: no writable EmulationStation configuration was found for '$CFW_NAME'"
@@ -292,14 +357,13 @@ if [ ! -f "$ES_CFG" ]; then
             ;;
     esac
 fi
-[ -w "$ES_CFG" ] || { echo "ERROR: EmulationStation configuration is not writable: $ES_CFG"; exit 21; }
+can_replace_config "$ES_CFG" || { echo "ERROR: EmulationStation configuration cannot be updated safely: $ES_CFG"; exit 21; }
 
-# EmuELEC's proven route uses the unescaped raw path token. ArkOS and the
-# Batocera-family frontends use %ROM% in their system definitions. For an
-# unknown existing config, follow the token style already present in that file.
+# Direct Bash commands use quoted %ROM_RAW% on EmuELEC and AmberELEC so paths
+# with spaces arrive unchanged. Keep the proven %ROM% route elsewhere.
 case "$CFW_KEY" in
-    *emuelec*) ROM_TOKEN="%ROM_RAW%" ;;
-    *arkos*|*rocknix*|*amberelec*|*351elec*|*knulli*|*batocera*) ROM_TOKEN="%ROM%" ;;
+    *emuelec*|*amberelec*|*351elec*) ROM_TOKEN="%ROM_RAW%" ;;
+    *darkos*|*darkosre*|*arkos*|*rocknix*|*knulli*|*batocera*) ROM_TOKEN="%ROM%" ;;
     *)
         if grep -F '%ROM_RAW%' "$ES_CFG" >/dev/null 2>&1; then ROM_TOKEN="%ROM_RAW%"; else ROM_TOKEN="%ROM%"; fi
         ;;
@@ -391,7 +455,7 @@ strip_flash_system() {
 
 patch_es_config() {
     cfg="$1"
-    tmp="$cfg.ruffle-clean.$$"; final="$cfg.ruffle-final.$$"
+    tmp="$STATE_DIR/es-clean.$$"; final="$STATE_DIR/es-final.$$"
     strip_flash_system "$cfg" "$tmp" || return 1
     flash_xml="$(xml_escape "$FLASHDIR")"
     entry_xml="$(xml_escape "$ES_LAUNCH")"
@@ -416,8 +480,58 @@ patch_es_config() {
       { print }
       END { if (!added) exit 20 }
     ' "$tmp" > "$final" || { rm -f "$tmp" "$final"; return 1; }
-    mv "$final" "$cfg" || { rm -f "$tmp" "$final"; return 1; }
+    backup_config_once "$cfg" || { rm -f "$tmp" "$final"; return 1; }
+    replace_config_file "$final" "$cfg" || { rm -f "$tmp" "$final"; return 1; }
     rm -f "$tmp"
+}
+
+# Remove only stale Flash blocks that are recognizably owned by an earlier
+# Ruffle Handheld release. A user's unrelated custom Flash integration is left
+# untouched. This prevents ArkOS-family and AmberELEC overlay files from
+# indexing the same SWF more than once.
+strip_owned_flash_system() {
+    cfg="$1"; out="$2"
+    awk '
+      function emit() {
+        lower=tolower(buf)
+        named=(lower ~ /<name>[[:space:]]*flash[[:space:]]*<\/name>/)
+        owned=(lower ~ /ruffle_handheld_flash/ || lower ~ /rufflehandheld/ || lower ~ /flash_runtime\/launch\.sh/ || lower ~ /ruffle_r36s/)
+        if (!(named && owned)) printf "%s", buf
+        buf=""; in_system=0
+      }
+      /<system[[:space:]>]/ {
+        in_system=1; buf=$0 ORS
+        if (/<\/system>/) emit()
+        next
+      }
+      in_system {
+        buf=buf $0 ORS
+        if (/<\/system>/) emit()
+        next
+      }
+      { print }
+      END { if (in_system) emit() }
+    ' "$cfg" > "$out"
+}
+
+clean_stale_ruffle_config() {
+    stale="$1"
+    [ -f "$stale" ] || return 0
+    [ "$stale" != "$ES_CFG" ] || return 0
+    grep -Eiq 'RUFFLE_HANDHELD_FLASH|rufflehandheld|flash_runtime/launch\.sh|ruffle_r36s' "$stale" || return 0
+    if ! can_replace_config "$stale"; then
+        echo "  WARNING: stale Ruffle configuration could not be cleaned: $stale"
+        return 0
+    fi
+    cleaned="$STATE_DIR/es-stale-clean.$$"
+    strip_owned_flash_system "$stale" "$cleaned" || { rm -f "$cleaned"; return 1; }
+    if cmp -s "$stale" "$cleaned"; then
+        rm -f "$cleaned"
+        return 0
+    fi
+    backup_config_once "$stale" || { rm -f "$cleaned"; return 1; }
+    replace_config_file "$cleaned" "$stale" || { rm -f "$cleaned"; return 1; }
+    echo "  stale Ruffle Flash block removed: $stale"
 }
 
 write_emuelec_dropin() {
@@ -468,6 +582,23 @@ case "$CFW_KEY" in
         ;;
 esac
 
+case "$CFW_KEY" in
+    *darkos*|*darkosre*|*arkos*)
+        ARKOS_SYSTEM_DIR="${RUFFLE_ARKOS_SYSTEM_DIR:-$(dirname "${RUFFLE_ARKOS_SYSTEM_CONFIG:-/etc/emulationstation/es_systems.cfg}")}"
+        ARKOS_USER_DIR="${RUFFLE_ARKOS_USER_DIR:-$(dirname "${RUFFLE_ARKOS_USER_CONFIG:-/home/ark/.emulationstation/es_systems.cfg}")}"
+        for stale in "$ARKOS_SYSTEM_DIR"/es_systems*.cfg "$ARKOS_USER_DIR"/es_systems*.cfg; do
+            clean_stale_ruffle_config "$stale" || { echo "ERROR: could not clean $stale"; exit 25; }
+        done
+        ;;
+    *amberelec*|*351elec*)
+        AMBER_USER_DIR="${RUFFLE_AMBERELEC_USER_DIR:-$(dirname "$ES_CFG")}"
+        AMBER_CONFIG_DIR="${RUFFLE_AMBERELEC_CONFIG_DIR:-/storage/.config/emulationstation}"
+        for stale in "$AMBER_USER_DIR"/es_systems*.cfg "$AMBER_CONFIG_DIR"/es_systems*.cfg; do
+            clean_stale_ruffle_config "$stale" || { echo "ERROR: could not clean $stale"; exit 25; }
+        done
+        ;;
+esac
+
 # This EmuELEC build runs emustation-config before every frontend start. On the
 # tested device that step can regenerate the active .config file from the
 # .emulationstation copy. Keep one identical Flash block in both files; removing
@@ -478,9 +609,7 @@ case "$CFW_KEY" in
         : > "$STATE_DIR/es-dropins.paths" || exit 25
         LEGACY_ES_CFG="${RUFFLE_ES_LEGACY_CONFIG:-/storage/.emulationstation/es_systems.cfg}"
         if [ -f "$LEGACY_ES_CFG" ] && [ "$LEGACY_ES_CFG" != "$ES_CFG" ]; then
-            [ -w "$LEGACY_ES_CFG" ] || { echo "ERROR: EmuELEC persistent configuration is not writable: $LEGACY_ES_CFG"; exit 25; }
-            [ -f "$LEGACY_ES_CFG.rufflehandheld-backup" ] || \
-                cp -p "$LEGACY_ES_CFG" "$LEGACY_ES_CFG.rufflehandheld-backup" || exit 25
+            can_replace_config "$LEGACY_ES_CFG" || { echo "ERROR: EmuELEC persistent configuration cannot be updated: $LEGACY_ES_CFG"; exit 25; }
             patch_es_config "$LEGACY_ES_CFG" || { echo "ERROR: could not synchronize $LEGACY_ES_CFG"; exit 25; }
             LEGACY_FLASH_COUNT="$(grep -c '<name>[[:space:]]*flash[[:space:]]*</name>' "$LEGACY_ES_CFG" 2>/dev/null || true)"
             [ "$LEGACY_FLASH_COUNT" = "1" ] || { echo "ERROR: persistent EmuELEC Flash count is $LEGACY_FLASH_COUNT"; exit 25; }
@@ -515,6 +644,7 @@ fi
 echo "[5/5] Final layout checks..."
 for executable in "$ENGINE/entrypoint.sh" "$ENGINE/es-launch.sh" "$ENGINE/native-adapter.sh" \
     "$ENGINE/multifile-adapter.sh" "$ENGINE/core/launch.sh" \
+    "$ENGINE/core/native_adaptive/ruffle-native-adaptive.aarch64" \
     "$ENGINE/core/native_v020/ruffle-native.aarch64" \
     "$ENGINE/core/native_multifile/ruffle-native-multifile.aarch64"; do
     [ -x "$executable" ] || { echo "ERROR: not executable: $executable"; exit 26; }
@@ -523,7 +653,7 @@ done
 [ -f "$PROFILEDIR/default.profile" ] || exit 28
 [ -d "$PROFILEDIR/custom" ] || exit 28
 [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
-printf '%s\n' "0.8.21" > "$APP_DIR/installed-version"
+printf '%s\n' "0.8.26" > "$APP_DIR/installed-version"
 sync
 echo "Core installation complete and verified."
 exit 0

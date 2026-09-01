@@ -1,6 +1,6 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.21 path adapter.
-# The v0.7.7 dispatcher and Native launchers remain byte-identical under core/.
+# Ruffle Handheld v0.8.26 path adapter.
+# The proven v0.7.7 executables remain byte-identical under core/.
 
 set -u
 RUNTIME_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
@@ -60,6 +60,8 @@ ln -s "$LAYOUT/app/runtime/core/native_v020/ruffle-native.aarch64" \
     "$COMPAT/runtime/ruffle-native.aarch64" || exit 3
 ln -s "$LAYOUT/app/runtime/core/native_multifile/ruffle-native-multifile.aarch64" \
     "$COMPAT/runtime/ruffle-native-multifile.aarch64" || exit 3
+ln -s "$LAYOUT/app/runtime/core/native_adaptive/ruffle-native-adaptive.aarch64" \
+    "$COMPAT/runtime/ruffle-native-adaptive.aarch64" || exit 3
 ln -s "$LAYOUT/app/runtime/core/native_v020/libruffle_cursorfix.aarch64.so" \
     "$COMPAT/runtime/libruffle_cursorfix.aarch64.so" || exit 3
 ln -s "$LAYOUT/app/runtime/core/lib" "$COMPAT/lib" || exit 3

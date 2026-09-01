@@ -2,6 +2,7 @@
 # A clicks only through gptokeyb2; Ruffle receives no A keyboard action.
 name=Papa's Pizzeria
 aliases=papa-s-pizzeria|papa-pizzeria|papas-pizzeria
+mouse_mode=mouse
 mouse_click=a
 
 dpad_up=none

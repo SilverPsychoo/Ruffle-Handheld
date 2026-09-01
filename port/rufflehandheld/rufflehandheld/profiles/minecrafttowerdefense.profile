@@ -2,6 +2,7 @@
 # Right stick moves the cursor; A digs, builds and selects. / El stick derecho mueve el cursor; A excava, construye y selecciona.
 name=Minecraft Tower Defense
 aliases=minecraft-tower-defense|minecraft-tower-defence|minecrafttowerdefence|minecraft-td|minecraft-tower-defense-1
+mouse_mode=mouse
 mouse_click=a
 
 dpad_up=none

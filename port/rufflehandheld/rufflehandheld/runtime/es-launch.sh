@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.21 EmulationStation boundary and per-game log adapter.
+# Ruffle Handheld v0.8.26 EmulationStation boundary and per-game log adapter.
 
 set -u
 RUNTIME_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
@@ -8,9 +8,10 @@ LOGDIR="$APP_DIR/logs"
 mkdir -p "$LOGDIR" || exit 3
 
 BASE="launch-error"
+HAS_SWF=0
 for arg in "$@"; do
     case "$arg" in
-        *.swf|*.SWF) BASE="$(basename "$arg")"; break ;;
+        *.swf|*.SWF) BASE="$(basename "$arg")"; HAS_SWF=1; break ;;
     esac
 done
 SAFE="$(printf '%s' "$BASE" | sed 's/[^A-Za-z0-9._-]/_/g')"
@@ -45,7 +46,7 @@ append_diagnostic() {
 cleanup_auxiliary_logs
 
 {
-    echo "Ruffle Handheld per-game log v0.8.21"
+    echo "Ruffle Handheld per-game log v0.8.26"
     echo "Game: $BASE"
     echo "Date: $(date 2>/dev/null || echo unavailable)"
     echo "Script: $0"
@@ -53,6 +54,15 @@ cleanup_auxiliary_logs
     printf 'Args:'
     for arg in "$@"; do printf ' <%s>' "$arg"; done
     echo
+    if [ "$HAS_SWF" -eq 0 ]; then
+        echo "Classification: EmulationStation did not pass a Flash game to Ruffle Handheld."
+        case " $* " in
+            *" -Pports "*|*" --core="*|*" --emulator="*)
+                echo "Detected route: Ports/runemu arguments. The Flash system registration is missing or inactive."
+                ;;
+        esac
+        echo "Installer diagnostic: $APP_DIR/logs/LAST-INSTALL.log"
+    fi
 } > "$LOG"
 
 /bin/bash "$RUNTIME_DIR/entrypoint.sh" "$@" >> "$LOG" 2>&1

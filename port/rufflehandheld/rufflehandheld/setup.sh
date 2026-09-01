@@ -1,8 +1,17 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.21 offline installer wrapper.
+# Ruffle Handheld v0.8.26 offline installer wrapper.
 
-VERSION="0.8.21"
+VERSION="0.8.26"
 APP_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
+LOG_DIR="$APP_DIR/logs"
+mkdir -p "$LOG_DIR" || exit 1
+INSTALL_LOG="$LOG_DIR/LAST-INSTALL.log"
+: > "$INSTALL_LOG" || exit 1
+if command -v tee >/dev/null 2>&1; then
+    exec > >(tee "$INSTALL_LOG") 2>&1
+else
+    exec >> "$INSTALL_LOG" 2>&1
+fi
 PORTS_DIR="${1:-$(dirname "$APP_DIR")}" 
 PORTS_DIR="$(CDPATH= cd -- "$PORTS_DIR" 2>/dev/null && pwd -P)" || {
     echo "ERROR: cannot resolve the Ports directory: $PORTS_DIR"
@@ -88,6 +97,7 @@ if [ -z "$CFW_NAME" ]; then
     else
         case "$CFW_HINT" in
             *emuelec*) CFW_NAME="EmuELEC" ;;
+            *darkos*|*darkosre*) CFW_NAME="dArkOSRE" ;;
             *arkos*) CFW_NAME="ArkOS" ;;
             *rocknix*) CFW_NAME="ROCKNIX" ;;
             *amberelec*|*351elec*) CFW_NAME="AmberELEC" ;;
@@ -143,9 +153,10 @@ frontend_pid() {
     fi
 }
 
-restart_emuelec_es() {
+restart_emustation_service() {
+    adapter_name="$1"
     old_pid="$(frontend_pid)"
-    echo "  EmuELEC adapter: emustation.service (old PID: ${old_pid:-not visible})"
+    echo "  $adapter_name adapter: emustation.service (old PID: ${old_pid:-not visible})"
     command -v systemctl >/dev/null 2>&1 || { echo "  WARNING: systemctl is unavailable."; return 1; }
     if ! systemctl restart emustation.service >/dev/null 2>&1; then
         echo "  WARNING: emustation.service restart failed."
@@ -171,6 +182,37 @@ restart_emuelec_es() {
     return 1
 }
 
+restart_arkos_service() {
+    old_pid="$(frontend_pid)"
+    echo "  ArkOS-family adapter: emulationstation.service (old PID: ${old_pid:-not visible})"
+    command -v systemctl >/dev/null 2>&1 || { echo "  WARNING: systemctl is unavailable."; return 1; }
+    if command -v sudo >/dev/null 2>&1; then
+        sudo -n systemctl restart emulationstation.service >/dev/null 2>&1 || {
+            echo "  WARNING: passwordless emulationstation.service restart failed."
+            return 1
+        }
+    else
+        systemctl restart emulationstation.service >/dev/null 2>&1 || {
+            echo "  WARNING: emulationstation.service restart failed."
+            return 1
+        }
+    fi
+    checks=0
+    while [ "$checks" -lt 12 ]; do
+        new_pid="$(frontend_pid)"
+        if systemctl is-active --quiet emulationstation.service 2>/dev/null; then
+            if [ -z "$old_pid" ] || [ -z "$new_pid" ] || [ "$new_pid" != "$old_pid" ]; then
+                echo "  EmulationStation reload verified (PID: ${new_pid:-service active})."
+                return 0
+            fi
+        fi
+        sleep 1
+        checks=$((checks + 1))
+    done
+    echo "  WARNING: ArkOS-family reload could not be verified."
+    return 1
+}
+
 echo "[2/3] Reloading the frontend..."
 RELOAD_OK=0
 if [ "${RUFFLE_SKIP_RESTART:-0}" = "1" ]; then
@@ -178,7 +220,9 @@ if [ "${RUFFLE_SKIP_RESTART:-0}" = "1" ]; then
     RELOAD_OK=1
 else
     case "$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')" in
-        *emuelec*) restart_emuelec_es && RELOAD_OK=1 ;;
+        *emuelec*) restart_emustation_service "EmuELEC" && RELOAD_OK=1 ;;
+        *amberelec*|*351elec*) restart_emustation_service "AmberELEC" && RELOAD_OK=1 ;;
+        *darkos*|*darkosre*|*arkos*) restart_arkos_service && RELOAD_OK=1 ;;
         *) echo "  No verified reload adapter for '$CFW_NAME'; restart the frontend manually." ;;
     esac
 fi
@@ -218,6 +262,7 @@ echo "Runtime: $APP_DIR/runtime"
 echo "Control profiles: $APP_DIR/profiles"
 echo "Visual profile maker: $APP_DIR/profile-maker.html"
 echo "Per-game logs: $APP_DIR/logs"
+echo "Last installation log: $INSTALL_LOG"
 if [ "$RELOAD_OK" -eq 1 ]; then
     echo "Frontend status: ready/reload requested successfully."
 else

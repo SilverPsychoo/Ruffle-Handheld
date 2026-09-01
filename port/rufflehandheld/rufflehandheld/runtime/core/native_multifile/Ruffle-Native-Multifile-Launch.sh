@@ -24,7 +24,14 @@ type get_controls >/dev/null 2>&1 && get_controls >/dev/null 2>&1 || true
 
 GAMEDIR="/${directory:-roms}/ports/ruffle_r36s"
 [ -d "$GAMEDIR" ] || GAMEDIR="/roms/ports/ruffle_r36s"
-BIN="$GAMEDIR/runtime/ruffle-native-multifile.aarch64"
+STABLE_BIN="$GAMEDIR/runtime/ruffle-native-multifile.aarch64"
+ADAPTIVE_BIN="$GAMEDIR/runtime/ruffle-native-adaptive.aarch64"
+ENGINE_LIB="$GAMEDIR/lib/engine.sh"
+[ -f "$ENGINE_LIB" ] || { echo "ERROR: engine selector missing: $ENGINE_LIB"; exit 3; }
+# shellcheck disable=SC1090
+source "$ENGINE_LIB"
+rh_select_engine "$STABLE_BIN" "$ADAPTIVE_BIN"
+BIN="$RH_ENGINE_BIN"
 CURSOR_SO="$GAMEDIR/runtime/libruffle_cursorfix.aarch64.so"
 LOGDIR="$GAMEDIR/logs/native"
 FLASHLOG="/${directory:-roms}/flash_runtime/logs"
@@ -52,6 +59,7 @@ echo "CFW: ${CFW_NAME:-unknown} ${CFW_VERSION:-}"
 echo "Device: ${DEVICE_NAME:-unknown} arch=${DEVICE_ARCH:-$(uname -m)}"
 echo "Selected SWF: $SWF"
 echo "Binary: $BIN"
+echo "Engine: $RH_ENGINE_MODE ($RH_ENGINE_REASON)"
 echo "Cursor shim: $CURSOR_SO"
 echo "Content root: /tmp/gdata_"
 
@@ -186,7 +194,7 @@ if [ -f "$CURSOR_SO" ]; then
     export LD_PRELOAD="$CURSOR_SO${LD_PRELOAD:+:$LD_PRELOAD}"
 fi
 
-echo "Input: native gamepad profile | right stick=mouse | click-helper=${RUFFLE_CLICK_BUTTON:-r1}"
+echo "Input: native gamepad profile | pointer=${RUFFLE_POINTER_MODE:-right-stick-mouse} | click-helper=${RUFFLE_CLICK_BUTTON:-r1}"
 echo "Starting generic multi-file Native binary..."
 cd /tmp || exit 10
 "$BIN"
