@@ -12,8 +12,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - run: python tools/build_release.py
+      - run: python -m unittest -v tests.test_v0827
       - uses: actions/upload-artifact@v4
         with:
           name: rufflehandheld-offline-release
-          path: releases/Ruffle-Handheld-v*-OFFLINE.zip
+          path: |
+            releases/Ruffle-Handheld-v*-OFFLINE.zip
+            releases/Ruffle-Handheld-v*-SOURCE.zip

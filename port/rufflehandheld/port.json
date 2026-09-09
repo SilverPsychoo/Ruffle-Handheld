@@ -9,7 +9,7 @@
     "attr": {
         "title": "Ruffle Handheld",
         "desc": "Offline Flash integration for ARM64 Linux handhelds, with frozen v0.7.7 binaries, profile-controlled buttons and a visual offline profile maker.",
-        "inst": "One universal launcher and one application folder. On EmuELEC place the .sh in ports_scripts and rufflehandheld in ports; on other CFWs use their normal Ports location. The same launcher detects the CFW and locates the application without downloading anything.",
+        "inst": "One universal launcher and one application folder. On EmuELEC place the .sh in ports_scripts and rufflehandheld in ports. On NextUI place both in its PORTS ROM folder and run once; setup creates Flash (FLASH) and FLASH.pak. The same offline launcher detects the frontend.",
         "genres": [
             "other"
         ],

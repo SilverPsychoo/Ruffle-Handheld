@@ -3,9 +3,6 @@
 # Physical A is `south`; use mouse_click=a for an explicit mouse click.
 name=My Game
 aliases=my-game|another-filename
-engine=auto
-force_scale=movie
-mouse_mode=gamepad
 mouse_click=r1
 
 dpad_up=38

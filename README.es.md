@@ -2,7 +2,7 @@
 
 [Read in English](README.md)
 
-Ruffle Handheld integra juegos Flash en consolas Linux ARM64 sin Internet. La versión 0.8.21 conserva byte por byte los binarios ARM64, cursor shim y optimización funcionales de v0.7.7. Añade seis perfiles comunitarios y un editor visual de controles totalmente disponible en español e inglés.
+Ruffle Handheld integra juegos Flash en consolas Linux ARM64 sin Internet. La versión 0.8.27 conserva byte por byte los binarios ARM64, cursor shim y optimización funcionales de v0.7.7. Restaura los adaptadores multi-CFW, conserva el modo Select+Start específico que elige PortMaster, cita correctamente rutas con espacios y recarga EmulationStation mediante un adaptador detectado para cada CFW.
 
 > **Estado:** community preview. Hardware probado: **RK3326 / aarch64**. CFW probado: **EmuELEC**. ArkOS, ROCKNIX, AmberELEC, muOS y Knulli se detectan para elegir un adaptador conservador, pero aún no se anuncian como soporte verificado.
 
@@ -16,6 +16,8 @@ rufflehandheld/
 ```
 
 En **EmuELEC**, coloca el mismo launcher en `ROMS/ports_scripts/Ruffle Handheld.sh` y la carpeta en `ROMS/ports/rufflehandheld/`. En ArkOS y otros CFW, instala esos mismos dos elementos mediante PortMaster o en la ubicación Ports normal de ese sistema. No existe una edición distinta del `.sh` para cada CFW.
+
+En **NextUI**, coloca esos mismos dos elementos en su carpeta `Roms/...Ports (PORTS)/` y ejecuta `Ruffle Handheld` una vez desde Ports. El instalador detecta `PORTS.pak`, crea `Emus/tg5040/FLASH.pak`, `Roms/Flash (FLASH)/` y `Roms/flash_data/`. NextUI requiere que su PortMaster PAK ya esté instalado, pero Ruffle Handheld no descarga nada.
 
 Al ejecutarlo, el único launcher detecta la raíz de ROMS y valida la aplicación en `ports/rufflehandheld/` mediante archivos centinela. No asume que la carpeta está junto al `.sh`, por lo que funciona cuando EmuELEC lo inicia desde `ports_scripts/`.
 
@@ -76,6 +78,8 @@ ports/rufflehandheld/profiles/
 
 Se incluyen perfiles para Fancy Pants, Dad 'n Me, Papa's Pizzeria, Henry Stickmin, Super Mario 63, Bad Ice-Cream 3, Garfield, The World's Hardest Game, Bejeweled 2, We Dancing Online, Ultimate Flash Sonic, Final Fantasy Sonic X5, Minecraft Tower Defense y Super Smash Flash 2. Los juegos únicamente de ratón usan A como clic mediante `gptokeyb2`; los juegos híbridos reservan R1 para el cursor.
 
+El hotkey de salida no se remapea en los perfiles de juego. Cuando existe PortMaster, Ruffle Handheld ejecuta su comando `$GPTOKEYB2` sin alterarlo, conservando la opción elegida por `control.txt` para ese CFW (por ejemplo `-Z` en ROCKNIX). Únicamente el fallback directo agrega la opción documentada `-1`.
+
 Los nuevos perfiles usan estos controles principales:
 
 | Juego | Controles portátiles |
@@ -88,8 +92,6 @@ Los nuevos perfiles usan estos controles principales:
 | Super Smash Flash 2 | Cruceta = WASD; A = ataque; B = especial; X = agarrar; Y = escudo; Start = iniciar; Select = pausa; L1 = burla; R1 = clic de menú |
 
 ### Remapeo visual
-
-El source también incluye `tools/profile-maker.html`, un editor de controles bilingüe y completamente offline para crear o modificar archivos `.profile` desde cualquier navegador de PC o celular. El Release conserva el mismo editor en `ports/rufflehandheld/profile-maker.html`, así que el usuario no necesita Python ni ningún servicio en línea para remapear controles.
 
 No es necesario aprender códigos de teclado ni editar `config.ron`:
 
@@ -106,14 +108,33 @@ Una actualización migra automáticamente `flash_profiles/*.profile` al nuevo di
 
 | CFW detectado | Registro Flash | Recarga automática | Estado |
 | --- | --- | --- | --- |
-| EmuELEC | Config principal y `es_systems_flash.cfg` en `.config` y `.emulationstation` | `emustation.service`, con comprobación | Verificado |
-| ArkOS | Solo un `es_systems.cfg` existente y escribible | Manual | No verificado |
-| ROCKNIX / AmberELEC | Solo config existente en `/storage` | Manual | No verificado |
-| Knulli / Batocera | Overlay `es_systems_rufflehandheld.cfg` | Manual | No verificado |
+| EmuELEC | Config principal y `es_systems_flash.cfg` en `.config` y `.emulationstation` | `emustation.service`, con PID nuevo comprobado | Verificado |
+| ArkOS / dArkOS | Config oficial `/etc/emulationstation/es_systems.cfg`; retira entradas Ruffle antiguas de la copia de usuario | `emulationstation.service`, con `sudo -n` cuando ya está disponible y comprobación | Adaptador comunitario; falta prueba física |
+| ROCKNIX | Copia de usuario escribible de la config del sistema; `%ROM_RAW%`; backend Wayland | `essway.service`, con comprobación del proceso y fallback genérico | Adaptador comunitario; falta prueba física |
+| AmberELEC / 351ELEC | Overlay Flash escribible e independiente bajo `/storage` | Detecta `emustation` o `emulationstation` y comprueba el PID | Adaptador comunitario; falta prueba física |
+| NextUI / TrimUI `tg5040` | `FLASH.pak` + `Roms/Flash (FLASH)` | Reescaneo al volver al menú | Adaptador comunitario, no verificado físicamente |
+| Knulli / Batocera | Overlay `es_systems_rufflehandheld.cfg`; H700 selecciona el driver SDL `mali` del sistema | `batocera-es-swissknife --restart` cuando existe; fallback a servicio detectado | Adaptador comunitario; falta prueba física |
 | muOS | Se detecta, pero no se finge que usa EmulationStation | No disponible | Adaptador pendiente |
 | Otro Linux ARM64 | Descubrimiento de una config existente y escribible | Manual | No verificado |
 
+### Estado de los reportes comunitarios
+
+| Reporte | Tratamiento en v0.8.27 |
+| --- | --- |
+| ArkOS: Flash no aparece como sistema y cada SWF aparece varias veces | Usa la config oficial de ArkOS y retira únicamente registros antiguos de Ruffle Handheld en configs auxiliares. Pendiente de confirmación física. |
+| ArkOS/dArkOS: sin controles, clic R1 o salida Select+Start | Amplía la búsqueda de `control.txt` y conserva los argumentos propios de PortMaster en lugar de reemplazarlos. Pendiente de confirmación física. |
+| ROCKNIX: instalador con código 21 o regreso al menú con `kmsdrm not available` | Materializa la copia de usuario escribible documentada y ejecuta mediante Wayland/Sway. Pendiente de confirmación física. |
+| NextUI: `pylibs.zip`, falta `GAMEDIR` y no ejecuta | Declara el `GAMEDIR` requerido por `PORTS.pak`, instala `FLASH.pak`, usa su Bash incluido y deja que SDL de TrimUI elija el backend. El aviso de `pylibs.zip` no se confunde con la causa fatal. Pendiente de confirmación física. |
+| AmberELEC: el instalador termina pero ES no se recarga | Detecta el servicio real, lo reinicia y verifica que cambió el proceso. Pendiente de confirmación física. |
+| We Dancing Online: teclas del perfil ignoradas | Perfil actualizado y helper limitado a clic/salida para no robar teclas a Native. |
+| Knulli: un juego se congela | No hay log suficiente para demostrar una causa; no se marca como corregido. |
+| Mario 63 a 8 FPS / una build de Bejeweled no avanza | Son límites de rendimiento o compatibilidad del SWF/runtime congelado, no fallos demostrados del instalador. |
+
 Cuando existe PortMaster, `control.txt` sigue siendo la fuente autoritativa. Sin PortMaster se usa el adaptador offline incluido. Un CFW sin adaptador seguro recibe un error claro; el instalador no escribe a ciegas ni declara éxito falso.
+
+ROCKNIX ejecuta aplicaciones externas bajo Sway/Wayland. Su adaptador conserva `WAYLAND_DISPLAY`, selecciona `SDL_VIDEODRIVER=wayland` y registra `%ROM_RAW%` entre comillas; también elige esa ruta cuando detecta una sesión Wayland válida aunque la etiqueta del CFW esté incompleta. EmuELEC conserva el flujo conocido con `%ROM_RAW%` y `kmsdrm`.
+
+En NextUI, el sistema se registra como un PAK de emulador independiente con etiqueta `FLASH`. Su SDL de TrimUI elige el backend de vídeo disponible en lugar de recibir el override incompatible `kmsdrm`. El logo se instala de forma conservadora en `Roms/.media/Flash (FLASH).png`. No se reemplaza el `bg.png` global del usuario.
 
 En EmuELEC, la entrada registrada es equivalente a (los adaptadores ArkOS/Knulli usan el token `%ROM%` de sus frontends):
 
@@ -123,7 +144,7 @@ En EmuELEC, la entrada registrada es equivalente a (los adaptadores ArkOS/Knulli
   <fullname>Adobe Flash Player</fullname>
   <path>RUTA_DETECTADA/flash</path>
   <extension>.swf .SWF</extension>
-  <command>/bin/bash RUTA_DETECTADA/ports/rufflehandheld/runtime/es-launch.sh "%ROM_RAW%"</command>
+  <command>/bin/bash "RUTA_DETECTADA/ports/rufflehandheld/runtime/es-launch.sh" "%ROM_RAW%"</command>
   <platform>flash</platform>
   <theme>flash</theme>
 </system>
@@ -138,7 +159,7 @@ Los assets incluidos son:
 - `theme/system.png`: logo completo de Adobe Flash Player.
 - `theme/background_icon.png`: fondo transparente con el chef.
 
-Si el theme activo ya contiene `flash/theme.xml`, se conserva íntegramente. Si falta y existe un layout `arcade/theme.xml` escribible, se crea solo `flash/` y se copian el layout, el logo y el chef. No se sobrescribe ningún archivo Flash existente. Si el theme no puede ampliarse con seguridad, se usa `arcade` como fallback.
+Si el theme activo ya contiene `flash/theme.xml`, se conserva íntegramente. Si falta y existe un layout `arcade/theme.xml` escribible, se crea solo `flash/` y se copian el layout, el logo y el chef. No se sobrescribe ningún archivo Flash existente. Si el theme no puede ampliarse con seguridad, el sistema conserva la clave `flash` y no se etiqueta como Arcade.
 
 ## Runtime conocido funcional
 
@@ -149,7 +170,7 @@ El build verifica SHA-256 y se detiene si cambia accidentalmente cualquier pieza
 - optimización;
 - logo y chef.
 
-Los binarios no se actualizaron. Los launchers, perfiles y su resolver están versionados intencionalmente en v0.8.21; los perfiles incluidos no contienen `native_a_mode`, las configuraciones antiguas se convierten de forma compatible y `profiles/custom/` mantiene prioridad. Sus hashes quedan fijados por el build.
+Los binarios no se actualizaron. Los launchers, perfiles y su resolver están versionados intencionalmente en v0.8.27; los perfiles incluidos no contienen `native_a_mode`, las configuraciones antiguas se convierten de forma compatible y `profiles/custom/` mantiene prioridad. Sus hashes quedan fijados por el build.
 
 ## Logs
 
@@ -182,7 +203,17 @@ El resultado es `releases/Ruffle-Handheld-vX.X.X-OFFLINE.zip` y contiene únicam
 
 ## Límite de las pruebas automáticas
 
-Las pruebas en un host no ARM verifican instalación limpia, actualización, XML, duplicados, espacios, permisos, LF, hashes, perfiles, theme y el flujo Simple/Multifile hasta el punto de ejecutar el binario. El binario ARM64 no se presenta como ejecutado en x86_64: renderizado, audio, cursor, controles físicos y la recarga real deben verificarse en la consola EmuELEC/RK3326.
+Las pruebas en un host no ARM verifican instalación limpia, actualización, XML, duplicados, rutas `%ROM%` con espacios, permisos, LF, hashes, perfiles, selección del comando hotkey de PortMaster, el PAK/backend de NextUI y el flujo Simple/Multifile hasta el punto de ejecutar el binario. El binario ARM64 no se presenta como ejecutado en x86_64: ROCKNIX/Wayland y NextUI/TrimUI aún requieren verificación física.
+
+## ☕ Apoya mis proyectos
+
+Si disfrutas mis proyectos, incluido Ruffle Handheld, y quieres apoyar las cosas que creo, puedes apoyarme en Ko-fi. 💙
+
+Tu apoyo me ayuda a seguir trabajando en Ruffle Handheld, probar juegos y consolas, mejorar la compatibilidad, añadir nuevas funciones y crear futuros proyectos.
+
+**[☕ Apóyame en Ko-fi](https://ko-fi.com/silverpsycho)**
+
+Ruffle Handheld seguirá siendo gratuito. Compartir el proyecto, reportar errores, sugerir juegos y formar parte de la comunidad ya significa muchísimo.
 
 ## Legal
 

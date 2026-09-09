@@ -1,10 +1,12 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.26 path adapter.
-# The proven v0.7.7 executables remain byte-identical under core/.
+# Ruffle Handheld v0.8.27 path adapter.
+# The v0.7.7 runtime layout is reproduced under /tmp without exposing it beside
+# the user's ROMs. Frozen binaries and their expected paths remain unchanged.
 
 set -u
 RUNTIME_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
 APP_DIR="$(dirname "$RUNTIME_DIR")"
+BASH_BIN="${RUFFLE_BASH:-${BASH:-/bin/bash}}"
 ROMROOT="${RUFFLE_ROM_ROOT:-}"
 
 if [ "${1:-}" = "--rom-root" ]; then
@@ -28,7 +30,9 @@ for arg in "$@"; do
 done
 [ -n "$SWF" ] || { echo "ERROR: no existing SWF received"; exit 2; }
 
-mkdir -p "$APP_DIR/logs" "$ROMROOT/flash" "$ROMROOT/flash_data" || exit 3
+FLASH_DIR="${RUFFLE_FLASH_DIR:-$ROMROOT/flash}"
+DATA_DIR="${RUFFLE_DATA_DIR:-$ROMROOT/flash_data}"
+mkdir -p "$APP_DIR/logs" "$FLASH_DIR" "$DATA_DIR" || exit 3
 
 # A no-space view keeps LD_PRELOAD safe even when Ports or a game path contains
 # spaces. It also presents the exact directory names expected by the frozen
@@ -44,8 +48,8 @@ mkdir -p "$LAYOUT/flash_runtime/native_v020" \
     "$LAYOUT/ports/ruffle_r36s/runtime" || exit 3
 
 ln -s "$APP_DIR" "$LAYOUT/app" || exit 3
-ln -s "$ROMROOT/flash" "$LAYOUT/flash" || exit 3
-ln -s "$ROMROOT/flash_data" "$LAYOUT/flash_data" || exit 3
+ln -s "$FLASH_DIR" "$LAYOUT/flash" || exit 3
+ln -s "$DATA_DIR" "$LAYOUT/flash_data" || exit 3
 ln -s "$LAYOUT/app/profiles" "$LAYOUT/flash_profiles" || exit 3
 ln -s "$LAYOUT/app/logs" "$LAYOUT/flash_runtime/logs" || exit 3
 ln -s "$LAYOUT/app/runtime/core/launch.sh" "$LAYOUT/flash_runtime/launch.sh" || exit 3
@@ -60,13 +64,11 @@ ln -s "$LAYOUT/app/runtime/core/native_v020/ruffle-native.aarch64" \
     "$COMPAT/runtime/ruffle-native.aarch64" || exit 3
 ln -s "$LAYOUT/app/runtime/core/native_multifile/ruffle-native-multifile.aarch64" \
     "$COMPAT/runtime/ruffle-native-multifile.aarch64" || exit 3
-ln -s "$LAYOUT/app/runtime/core/native_adaptive/ruffle-native-adaptive.aarch64" \
-    "$COMPAT/runtime/ruffle-native-adaptive.aarch64" || exit 3
 ln -s "$LAYOUT/app/runtime/core/native_v020/libruffle_cursorfix.aarch64.so" \
     "$COMPAT/runtime/libruffle_cursorfix.aarch64.so" || exit 3
 ln -s "$LAYOUT/app/runtime/core/lib" "$COMPAT/lib" || exit 3
 ln -s "$LAYOUT/app/logs" "$COMPAT/logs" || exit 3
-ln -s "$ROMROOT/flash" "$COMPAT/games" || exit 3
+ln -s "$FLASH_DIR" "$COMPAT/games" || exit 3
 
 export RUFFLE_APP_DIR="$LAYOUT/app"
 export RUFFLE_ROM_ROOT="$ROMROOT"
@@ -76,6 +78,7 @@ export RUFFLE_FLASH_LOG="$LAYOUT/app/logs"
 export RUFFLE_ADAPTER_TMP="$LAYOUT"
 
 find_portmaster_control() {
+    RUFFLE_PORTMASTER_CONTROL=""
     for candidate in \
         /opt/system/Tools/PortMaster/control.txt \
         /opt/tools/PortMaster/control.txt \
@@ -86,12 +89,30 @@ find_portmaster_control() {
         /roms2/ports/PortMaster/control.txt \
         /storage/roms/ports/PortMaster/control.txt \
         /storage/roms2/ports/PortMaster/control.txt; do
-        [ -f "$candidate" ] && return 0
+        if [ -f "$candidate" ]; then
+            RUFFLE_PORTMASTER_CONTROL="$candidate"
+            export RUFFLE_PORTMASTER_CONTROL
+            return 0
+        fi
     done
     return 1
 }
 
-if ! find_portmaster_control; then
+if find_portmaster_control; then
+    # The frozen Native launchers know PortMaster's traditional XDG location,
+    # but not every CFW stores it there. Present the discovered folder through
+    # a short, space-free compatibility path so both control.txt and gptokeyb2
+    # are resolved identically by the dispatcher and both Native launchers.
+    PM_COMPAT_DATA="$LAYOUT/portmaster-data"
+    PM_REAL_DIR="$(dirname -- "$RUFFLE_PORTMASTER_CONTROL")"
+    mkdir -p "$PM_COMPAT_DATA" || exit 3
+    ln -s "$PM_REAL_DIR" "$PM_COMPAT_DATA/PortMaster" || exit 3
+    export XDG_DATA_HOME="$PM_COMPAT_DATA"
+    controlfolder="$PM_COMPAT_DATA/PortMaster"
+    export controlfolder
+    RUFFLE_PORTMASTER_CONTROL="$controlfolder/control.txt"
+    export RUFFLE_PORTMASTER_CONTROL
+else
     export RUFFLE_STANDALONE_DIRECTORY="${ROMROOT#/}"
     export RUFFLE_STANDALONE_ROMROOT="$ROMROOT"
     export XDG_DATA_HOME="$LAYOUT/app/runtime/standalone"
@@ -106,7 +127,7 @@ MEMORY_LOG="$APP_DIR/logs/LAST-LAUNCH-MEMORY.log"
     grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree):' /proc/meminfo 2>/dev/null || true
 } > "$MEMORY_LOG"
 
-/bin/bash "$LAYOUT/flash_runtime/launch.sh" "$@"
+"$BASH_BIN" "$LAYOUT/flash_runtime/launch.sh" "$@"
 LAUNCH_RC=$?
 
 {

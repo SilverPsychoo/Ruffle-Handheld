@@ -1,6 +1,6 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.26 core installer.
-# Registers the stable v0.7.7 core plus the opt-in adaptive ARM64 core.
+# Ruffle Handheld v0.8.27 core installer.
+# Registers the frozen v0.7.7 core in-place inside the Ruffle Handheld bundle.
 
 ROMROOT="$1"
 APP_DIR="$2"
@@ -9,7 +9,11 @@ CFW_NAME="${3:-unknown}"
 [ -d "$APP_DIR/runtime/core" ] || { echo "ERROR: bundled runtime missing"; exit 3; }
 [ -f "$APP_DIR/profiles/default.profile" ] || { echo "ERROR: bundled profiles missing"; exit 4; }
 
-FLASHDIR="$ROMROOT/flash"
+CFW_KEY="$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')"
+case "$CFW_KEY" in
+    *nextui*) FLASHDIR="$ROMROOT/Flash (FLASH)" ;;
+    *) FLASHDIR="$ROMROOT/flash" ;;
+esac
 DATADIR="$ROMROOT/flash_data"
 PROFILEDIR="$APP_DIR/profiles"
 ENGINE="$APP_DIR/runtime"
@@ -18,7 +22,7 @@ MIGRATED="$APP_DIR/migrated"
 STATE_DIR="${RUFFLE_INSTALL_STATE_DIR:-$APP_DIR/.install-state}"
 mkdir -p "$FLASHDIR" "$DATADIR" "$PROFILEDIR/custom" "$LOGDIR" "$STATE_DIR" || exit 5
 
-# v0.8.26 keeps only one persistent log per game. Remove diagnostic files and
+# v0.8.27 keeps only one persistent log per game. Remove diagnostic files and
 # duplicate per-backend logs left by older releases; games and profiles are not
 # touched. Current per-game logs directly under logs/ are preserved.
 for obsolete_log in \
@@ -26,6 +30,7 @@ for obsolete_log in \
     "$APP_DIR/install.log" \
     "$APP_DIR/bootstrap.log" \
     "$APP_DIR/Ruffle-Handheld-install.log" \
+    "$APP_DIR/LAST-INSTALL.log" \
     "$LOGDIR/bootstrap.log" \
     "$LOGDIR/ES-LAUNCH.log" \
     "$LOGDIR/install.log" \
@@ -49,7 +54,7 @@ for migrated_log in \
     [ -f "$migrated_log" ] && rm -f "$migrated_log"
 done
 
-echo "=== Core install: stable v0.7.7 + adaptive ARM64 under v0.8.26 installer ==="
+echo "=== Core install: v0.7.7 binaries under v0.8.27 installer ==="
 echo "ROM root: $ROMROOT"
 echo "Application: $APP_DIR"
 echo "CFW adapter: $CFW_NAME"
@@ -212,9 +217,7 @@ for required in \
     "$ENGINE/core/launch.sh" \
     "$ENGINE/es-launch.sh" \
     "$ENGINE/core/lib/control_profiles.sh" \
-    "$ENGINE/core/lib/engine.sh" \
     "$ENGINE/core/lib/performance.sh" \
-    "$ENGINE/core/native_adaptive/ruffle-native-adaptive.aarch64" \
     "$ENGINE/core/native_v020/Ruffle-Native-Launch.sh" \
     "$ENGINE/core/native_v020/libruffle_cursorfix.aarch64.so" \
     "$ENGINE/core/native_v020/ruffle-native.aarch64" \
@@ -226,71 +229,174 @@ for required in \
     [ -f "$required" ] || { echo "ERROR: bundled file missing: $required"; exit 13; }
 done
 chmod +x "$ENGINE/entrypoint.sh" "$ENGINE/es-launch.sh" "$ENGINE/native-adapter.sh" "$ENGINE/multifile-adapter.sh" \
-    "$ENGINE/core/launch.sh" "$ENGINE/core/lib/engine.sh" "$ENGINE/core/lib/performance.sh" \
-    "$ENGINE/core/native_adaptive/ruffle-native-adaptive.aarch64" \
+    "$ENGINE/core/launch.sh" "$ENGINE/core/lib/performance.sh" \
     "$ENGINE/core/native_v020/Ruffle-Native-Launch.sh" \
     "$ENGINE/core/native_v020/ruffle-native.aarch64" \
     "$ENGINE/core/native_multifile/Ruffle-Native-Multifile-Launch.sh" \
     "$ENGINE/core/native_multifile/ruffle-native-multifile.aarch64" || exit 14
 echo "  runtime stays in-place; no duplicate binary tree was created"
 
+# NextUI does not use EmulationStation. Register Flash as a standalone emulator
+# PAK, while leaving Ruffle and all profiles in the existing application folder.
+# PORTS.pak supplies the Bash and PortMaster controller bridge already present
+# on that frontend; the Ruffle release itself remains completely offline.
+case "$CFW_KEY" in
+    *nextui*)
+        NEXTUI_SD="${RUFFLE_NEXTUI_SD:-}"
+        NEXTUI_PLATFORM="${RUFFLE_NEXTUI_PLATFORM:-}"
+        NEXTUI_APP_DIR="${RUFFLE_NEXTUI_APP_DIR:-$APP_DIR}"
+        [ -n "$NEXTUI_SD" ] && [ -d "$NEXTUI_SD/Roms" ] || {
+            echo "ERROR: invalid NextUI SD root: $NEXTUI_SD"; exit 20;
+        }
+        [ -n "$NEXTUI_PLATFORM" ] || { echo "ERROR: NextUI platform was not detected"; exit 20; }
+        [ -f "$NEXTUI_APP_DIR/runtime/es-launch.sh" ] || {
+            echo "ERROR: persistent NextUI application path is invalid: $NEXTUI_APP_DIR"; exit 20;
+        }
+        NEXTUI_PM="$NEXTUI_SD/Emus/$NEXTUI_PLATFORM/PORTS.pak"
+        [ -x "$NEXTUI_PM/bin/bash" ] || {
+            echo "ERROR: PORTS.pak Bash is missing: $NEXTUI_PM/bin/bash"; exit 20;
+        }
+        NEXTUI_PAK="$NEXTUI_SD/Emus/$NEXTUI_PLATFORM/FLASH.pak"
+        mkdir -p "$NEXTUI_PAK" "$FLASHDIR" "$DATADIR" "$ROMROOT/.media" || exit 20
+        printf '%s\n' "$NEXTUI_APP_DIR" > "$NEXTUI_PAK/ruffle-app.path" || exit 20
+        cat > "$NEXTUI_PAK/launch.sh" <<'PAK_LAUNCH'
+#!/bin/sh
+# Ruffle Handheld NextUI standalone Flash PAK.
+PAK_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 1
+ROM="${1:-}"
+[ -n "$ROM" ] && [ -f "$ROM" ] || { echo "Ruffle Handheld: no valid SWF received"; exit 2; }
+[ -f "$PAK_DIR/ruffle-app.path" ] || { echo "Ruffle Handheld: application pointer missing"; exit 3; }
+APP_DIR="$(sed -n '1p' "$PAK_DIR/ruffle-app.path")"
+[ -f "$APP_DIR/runtime/es-launch.sh" ] || { echo "Ruffle Handheld: installed runtime missing"; exit 3; }
+
+SDCARD_ROOT="${SDCARD_PATH:-$(dirname "$(dirname "$(dirname "$PAK_DIR")")")}"
+PLATFORM_NAME="${PLATFORM:-$(basename "$(dirname "$PAK_DIR")")}"
+PORTS_PAK="$SDCARD_ROOT/Emus/$PLATFORM_NAME/PORTS.pak"
+BASH_BIN="$PORTS_PAK/bin/bash"
+[ -x "$BASH_BIN" ] || { echo "Ruffle Handheld: PORTS.pak Bash missing"; exit 4; }
+
+export PATH="$PORTS_PAK/PortMaster:$PORTS_PAK/bin:$PATH"
+export LD_LIBRARY_PATH="$PORTS_PAK/lib:/usr/trimui/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export XDG_DATA_HOME="$PORTS_PAK"
+export RUFFLE_BASH="$BASH_BIN"
+export RUFFLE_CFW_NAME="NextUI"
+export CFW_NAME="NextUI"
+export RUFFLE_ROM_ROOT="$SDCARD_ROOT/Roms"
+export RUFFLE_FLASH_DIR="$SDCARD_ROOT/Roms/Flash (FLASH)"
+export RUFFLE_DATA_DIR="$SDCARD_ROOT/Roms/flash_data"
+exec "$BASH_BIN" "$APP_DIR/runtime/es-launch.sh" --rom-root "$RUFFLE_ROM_ROOT" "$ROM"
+PAK_LAUNCH
+        chmod +x "$NEXTUI_PAK/launch.sh" || exit 20
+        # NextUI system artwork lives in Roms/.media. Preserve user artwork.
+        [ -e "$ROMROOT/.media/Flash (FLASH).png" ] || \
+            cp "$APP_DIR/theme/system.png" "$ROMROOT/.media/Flash (FLASH).png" || true
+        [ -e "$NEXTUI_PAK/background_icon.png" ] || \
+            cp "$APP_DIR/theme/background_icon.png" "$NEXTUI_PAK/background_icon.png" || true
+        printf '%s\n' "$NEXTUI_PAK" > "$STATE_DIR/nextui-pak.path" || exit 20
+        printf '%s\n' "0.8.27" > "$APP_DIR/installed-version"
+        [ -x "$NEXTUI_PAK/launch.sh" ] || exit 26
+        [ -d "$FLASHDIR" ] && [ -d "$DATADIR" ] || exit 27
+        [ -f "$PROFILEDIR/default.profile" ] || exit 28
+        [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
+        sync
+        echo "  frontend adapter: nextui-standalone-pak-community-test"
+        echo "  Flash PAK: $NEXTUI_PAK"
+        echo "  Games: $FLASHDIR"
+        echo "Core installation complete and verified."
+        exit 0
+        ;;
+esac
+
 xml_escape() {
     printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
 }
 
+# ArkOS keeps its authoritative system list under /etc, while several other
+# frontends keep it on writable storage.  PortMaster normally runs with enough
+# privileges to update either location, but ArkOS requires its existing sudo
+# bridge.  Never prompt for a password from a controller-only installer.
 can_replace_config() {
-    target="$1"
-    if [ -e "$target" ]; then
-        [ -f "$target" ] || return 1
-        [ -w "$target" ] && return 0
-    else
-        [ -d "$(dirname "$target")" ] && [ -w "$(dirname "$target")" ] && return 0
-    fi
+    cfg="$1"
+    [ -f "$cfg" ] || return 1
+    [ -w "$cfg" ] && return 0
     command -v sudo >/dev/null 2>&1 || return 1
-    sudo -n true >/dev/null 2>&1 || return 1
-    if [ -e "$target" ]; then
-        sudo -n test -w "$target" >/dev/null 2>&1
-    else
-        sudo -n test -w "$(dirname "$target")" >/dev/null 2>&1
-    fi
+    sudo -n test -w "$cfg" >/dev/null 2>&1
 }
 
-replace_config_file() {
-    source_file="$1"; target="$2"
-    if { [ -e "$target" ] && [ -w "$target" ]; } || \
-       { [ ! -e "$target" ] && [ -w "$(dirname "$target")" ]; }; then
-        cp "$source_file" "$target" || return 1
-        rm -f "$source_file"
+replace_config() {
+    source_cfg="$1"; destination_cfg="$2"
+    destination_dir="$(dirname "$destination_cfg")"
+    if [ -w "$destination_cfg" ]; then
+        if [ -w "$destination_dir" ]; then
+            mv "$source_cfg" "$destination_cfg"
+            return $?
+        fi
+        cp "$source_cfg" "$destination_cfg" || return 1
+        rm -f "$source_cfg" 2>/dev/null || true
         return 0
     fi
     command -v sudo >/dev/null 2>&1 || return 1
-    sudo -n cp "$source_file" "$target" >/dev/null 2>&1 || return 1
-    rm -f "$source_file"
+    privileged_tmp="$destination_cfg.ruffle-new.$$"
+    sudo -n cp "$source_cfg" "$privileged_tmp" >/dev/null 2>&1 || return 1
+    sudo -n chmod 644 "$privileged_tmp" >/dev/null 2>&1 || true
+    sudo -n mv "$privileged_tmp" "$destination_cfg" >/dev/null 2>&1 || {
+        sudo -n rm -f "$privileged_tmp" >/dev/null 2>&1 || true
+        return 1
+    }
+    rm -f "$source_cfg" 2>/dev/null || true
+    return 0
 }
 
 backup_config_once() {
-    target="$1"; backup="$target.rufflehandheld-backup"
-    [ -f "$target" ] || return 0
+    cfg="$1"; backup="$cfg.rufflehandheld-backup"
     [ -e "$backup" ] && return 0
-    if [ -w "$(dirname "$target")" ]; then
-        cp -p "$target" "$backup"
+    if [ -w "$(dirname "$cfg")" ]; then
+        cp -p "$cfg" "$backup"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo -n cp -p "$cfg" "$backup" >/dev/null 2>&1 && return 0
+        cfg_id="$(printf '%s' "$cfg" | tr '/ ' '__')"
+        fallback_backup="$MIGRATED/es-config-backups/$cfg_id"
+        mkdir -p "$(dirname "$fallback_backup")" || return 1
+        [ -e "$fallback_backup" ] || cp -p "$cfg" "$fallback_backup"
     else
-        command -v sudo >/dev/null 2>&1 && sudo -n cp -p "$target" "$backup" >/dev/null 2>&1
+        cfg_id="$(printf '%s' "$cfg" | tr '/ ' '__')"
+        fallback_backup="$MIGRATED/es-config-backups/$cfg_id"
+        mkdir -p "$(dirname "$fallback_backup")" || return 1
+        [ -e "$fallback_backup" ] || cp -p "$cfg" "$fallback_backup"
     fi
 }
 
-create_empty_config() {
-    target="$1"; target_dir="$(dirname "$target")"
-    if [ ! -d "$target_dir" ]; then
-        mkdir -p "$target_dir" 2>/dev/null || \
-            { command -v sudo >/dev/null 2>&1 && sudo -n mkdir -p "$target_dir" >/dev/null 2>&1; } || return 1
+# ROCKNIX ships the user configuration as a link to its read-only system
+# image. Its documented customization route is to replace that link with a
+# writable copy under /storage/.config/emulationstation. Preserve the original
+# link once, then patch only the copy.
+materialize_rocknix_config() {
+    user_cfg="${RUFFLE_ROCKNIX_ES_CONFIG:-/storage/.config/emulationstation/es_systems.cfg}"
+    system_cfg="${RUFFLE_ROCKNIX_SYSTEM_CONFIG:-/usr/config/emulationstation/es_systems.cfg}"
+    user_dir="$(dirname "$user_cfg")"
+    mkdir -p "$user_dir" || return 1
+
+    if [ -L "$user_cfg" ]; then
+        original_link="$user_cfg.rufflehandheld-original-link"
+        [ -e "$original_link" ] || [ -L "$original_link" ] || cp -P "$user_cfg" "$original_link" || return 1
+        writable_copy="$STATE_DIR/rocknix-es-systems.$$"
+        cp -L "$user_cfg" "$writable_copy" 2>/dev/null || \
+            cp "$system_cfg" "$writable_copy" 2>/dev/null || return 1
+        chmod 644 "$writable_copy" 2>/dev/null || true
+        mv "$writable_copy" "$user_cfg" || return 1
+        echo "  ROCKNIX read-only configuration link replaced by a writable user copy"
+    elif [ ! -f "$user_cfg" ]; then
+        if [ -f "$system_cfg" ]; then
+            cp "$system_cfg" "$user_cfg" || return 1
+        else
+            { echo '<?xml version="1.0"?>'; echo '<systemList>'; echo '</systemList>'; } > "$user_cfg" || return 1
+        fi
     fi
-    tmp="$STATE_DIR/empty-es-system-list.$$"
-    { echo '<?xml version="1.0"?>'; echo '<systemList>'; echo '</systemList>'; } > "$tmp" || return 1
-    replace_config_file "$tmp" "$target"
+    chmod u+w "$user_cfg" 2>/dev/null || true
+    [ -f "$user_cfg" ] && [ -w "$user_cfg" ] || return 1
+    ES_CFG="$user_cfg"
 }
 
-CFW_KEY="$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')"
 ES_CFG="${RUFFLE_ES_CONFIG:-}"
 ES_ADAPTER="generic-existing"
 if [ -z "$ES_CFG" ]; then
@@ -307,28 +413,27 @@ if [ -z "$ES_CFG" ]; then
             ES_ADAPTER="knulli-overlay-unverified"
             ES_CFG="${RUFFLE_KNULLI_ES_CONFIG:-/userdata/system/configs/emulationstation/es_systems_rufflehandheld.cfg}"
             ;;
-        *amberelec*|*351elec*)
-            # AmberELEC's base configuration is a read-only /etc symlink. Its
-            # EmulationStation fork explicitly loads es_systems_*.cfg from the
-            # user directory, which is /storage/.emulationstation.
-            ES_ADAPTER="amberelec-overlay-verified"
-            ES_CFG="${RUFFLE_AMBERELEC_ES_CONFIG:-/storage/.emulationstation/es_systems_rufflehandheld.cfg}"
-            ;;
-        *darkos*|*darkosre*|*arkos*)
-            ES_ADAPTER="arkos-family-existing"
+        *arkos*|*darkos*)
+            ES_ADAPTER="arkos-official-config-community-test"
+            # ArkOS itself updates /etc/emulationstation/es_systems.cfg and
+            # documents it as the active system list. Prefer it over a stale
+            # per-user copy, using passwordless sudo only when already present.
             for candidate in \
-                "${RUFFLE_ARKOS_SYSTEM_CONFIG:-/etc/emulationstation/es_systems.cfg}" \
+                "${RUFFLE_ARKOS_SYSTEM_CONFIG:-${RUFFLE_ARKOS_ES_CONFIG:-/etc/emulationstation/es_systems.cfg}}" \
                 "${RUFFLE_ARKOS_USER_CONFIG:-/home/ark/.emulationstation/es_systems.cfg}"; do
-                [ -f "$candidate" ] && can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
+                can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
             done
             ;;
         *rocknix*)
-            ES_ADAPTER="storage-existing-unverified"
-            for candidate in \
-                "${RUFFLE_STORAGE_ES_CONFIG:-/storage/.config/emulationstation/es_systems.cfg}" \
-                "${RUFFLE_STORAGE_LEGACY_ES_CONFIG:-/storage/.emulationstation/es_systems.cfg}"; do
-                [ -f "$candidate" ] && can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
-            done
+            ES_ADAPTER="rocknix-user-copy-community-test"
+            materialize_rocknix_config || {
+                echo "ERROR: could not create the writable ROCKNIX EmulationStation configuration"
+                exit 21
+            }
+            ;;
+        *amberelec*|*351elec*)
+            ES_ADAPTER="amberelec-overlay-unverified"
+            ES_CFG="${RUFFLE_AMBERELEC_ES_CONFIG:-/storage/.emulationstation/es_systems_rufflehandheld.cfg}"
             ;;
         *muos*) ES_ADAPTER="muos-no-emulationstation-adapter" ;;
     esac
@@ -340,15 +445,16 @@ if [ -z "$ES_CFG" ]; then
         /storage/.config/emulationstation/es_systems.cfg \
         /storage/.emulationstation/es_systems.cfg \
         /userdata/system/configs/emulationstation/es_systems.cfg; do
-        [ -f "$candidate" ] && can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
+        can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
     done
 fi
 
 if [ ! -f "$ES_CFG" ]; then
     case "$ES_ADAPTER" in
-        emuelec-verified|knulli-overlay-unverified|amberelec-overlay-verified|generic-existing)
+        emuelec-verified|knulli-overlay-unverified|amberelec-overlay-unverified|generic-existing)
             [ -n "$ES_CFG" ] || { echo "ERROR: no EmulationStation configuration was found"; exit 21; }
-            create_empty_config "$ES_CFG" || { echo "ERROR: could not create EmulationStation overlay: $ES_CFG"; exit 21; }
+            mkdir -p "$(dirname "$ES_CFG")" || exit 21
+            { echo '<?xml version="1.0"?>'; echo '<systemList>'; echo '</systemList>'; } > "$ES_CFG" || exit 21
             ;;
         *)
             echo "ERROR: no writable EmulationStation configuration was found for '$CFW_NAME'"
@@ -359,18 +465,19 @@ if [ ! -f "$ES_CFG" ]; then
 fi
 can_replace_config "$ES_CFG" || { echo "ERROR: EmulationStation configuration cannot be updated safely: $ES_CFG"; exit 21; }
 
-# Direct Bash commands use quoted %ROM_RAW% on EmuELEC and AmberELEC so paths
-# with spaces arrive unchanged. Keep the proven %ROM% route elsewhere.
+# EmuELEC's proven route uses the unescaped raw path token. ArkOS and the
+# Batocera-family frontends use %ROM% in their system definitions. For an
+# unknown existing config, follow the token style already present in that file.
 case "$CFW_KEY" in
-    *emuelec*|*amberelec*|*351elec*) ROM_TOKEN="%ROM_RAW%" ;;
-    *darkos*|*darkosre*|*arkos*|*rocknix*|*knulli*|*batocera*) ROM_TOKEN="%ROM%" ;;
+    *emuelec*|*rocknix*|*amberelec*|*351elec*) ROM_TOKEN="%ROM_RAW%" ;;
+    *arkos*|*darkos*|*knulli*|*batocera*) ROM_TOKEN="%ROM%" ;;
     *)
         if grep -F '%ROM_RAW%' "$ES_CFG" >/dev/null 2>&1; then ROM_TOKEN="%ROM_RAW%"; else ROM_TOKEN="%ROM%"; fi
         ;;
 esac
 
 ES_LAUNCH="$ENGINE/es-launch.sh"
-ES_COMMAND_STYLE="standard"
+ES_COMMAND_STYLE="standard-escaped"
 case "$CFW_KEY" in
     *emuelec*)
         ES_LAUNCH="$ENGINE/es-launch.sh"
@@ -379,7 +486,9 @@ case "$CFW_KEY" in
 esac
 
 echo "[3/5] Integrating the active theme conservatively..."
-THEME_TAG="arcade"
+# Keep the system identity as Flash even when a read-only theme cannot be
+# extended. Using `arcade` here made Knulli group and label Flash as Arcade.
+THEME_TAG="flash"
 THEMESET=""
 for settings in \
     "${RUFFLE_ES_SETTINGS:-}" \
@@ -426,7 +535,7 @@ elif [ -n "$ACTIVE_THEME" ] && [ -f "$ACTIVE_THEME/arcade/theme.xml" ] && [ -w "
         echo "  Flash theme created with the Adobe logo and chef artwork: $FLASH_THEME"
     fi
 else
-    echo "  active theme cannot be extended safely; Arcade fallback retained"
+    echo "  active theme cannot be extended safely; Flash theme key retained"
 fi
 
 strip_flash_system() {
@@ -455,7 +564,8 @@ strip_flash_system() {
 
 patch_es_config() {
     cfg="$1"
-    tmp="$STATE_DIR/es-clean.$$"; final="$STATE_DIR/es-final.$$"
+    cfg_id="$(printf '%s' "$cfg" | tr '/ ' '__')"
+    tmp="$STATE_DIR/$cfg_id.clean.$$"; final="$STATE_DIR/$cfg_id.final.$$"
     strip_flash_system "$cfg" "$tmp" || return 1
     flash_xml="$(xml_escape "$FLASHDIR")"
     entry_xml="$(xml_escape "$ES_LAUNCH")"
@@ -469,7 +579,9 @@ patch_es_config() {
         print "    <path>" flashdir "</path>"
         print "    <extension>.swf .SWF</extension>"
         if (commandstyle == "emuelec-v077-simple")
-          print "    <command>/bin/bash " entry " \"" romtoken "\"</command>"
+          print "    <command>/bin/bash &quot;" entry "&quot; &quot;" romtoken "&quot;</command>"
+        else if (commandstyle == "standard-escaped")
+          print "    <command>/bin/bash &quot;" entry "&quot; --rom-root &quot;" romroot "&quot; &quot;" romtoken "&quot;</command>"
         else
           print "    <command>/bin/bash \"" entry "\" --rom-root \"" romroot "\" \"" romtoken "\"</command>"
         print "    <platform>flash</platform>"
@@ -481,57 +593,30 @@ patch_es_config() {
       END { if (!added) exit 20 }
     ' "$tmp" > "$final" || { rm -f "$tmp" "$final"; return 1; }
     backup_config_once "$cfg" || { rm -f "$tmp" "$final"; return 1; }
-    replace_config_file "$final" "$cfg" || { rm -f "$tmp" "$final"; return 1; }
+    replace_config "$final" "$cfg" || { rm -f "$tmp" "$final"; return 1; }
     rm -f "$tmp"
 }
 
-# Remove only stale Flash blocks that are recognizably owned by an earlier
-# Ruffle Handheld release. A user's unrelated custom Flash integration is left
-# untouched. This prevents ArkOS-family and AmberELEC overlay files from
-# indexing the same SWF more than once.
-strip_owned_flash_system() {
-    cfg="$1"; out="$2"
-    awk '
-      function emit() {
-        lower=tolower(buf)
-        named=(lower ~ /<name>[[:space:]]*flash[[:space:]]*<\/name>/)
-        owned=(lower ~ /ruffle_handheld_flash/ || lower ~ /rufflehandheld/ || lower ~ /flash_runtime\/launch\.sh/ || lower ~ /ruffle_r36s/)
-        if (!(named && owned)) printf "%s", buf
-        buf=""; in_system=0
-      }
-      /<system[[:space:]>]/ {
-        in_system=1; buf=$0 ORS
-        if (/<\/system>/) emit()
-        next
-      }
-      in_system {
-        buf=buf $0 ORS
-        if (/<\/system>/) emit()
-        next
-      }
-      { print }
-      END { if (in_system) emit() }
-    ' "$cfg" > "$out"
+is_ruffle_owned_config() {
+    cfg="$1"
+    grep -E 'RUFFLE_HANDHELD_FLASH|rufflehandheld/runtime/es-launch\.sh|/flash_runtime/launch\.sh|/ports/ruffle_r36s/' \
+        "$cfg" >/dev/null 2>&1
 }
 
-clean_stale_ruffle_config() {
-    stale="$1"
-    [ -f "$stale" ] || return 0
-    [ "$stale" != "$ES_CFG" ] || return 0
-    grep -Eiq 'RUFFLE_HANDHELD_FLASH|rufflehandheld|flash_runtime/launch\.sh|ruffle_r36s' "$stale" || return 0
-    if ! can_replace_config "$stale"; then
-        echo "  WARNING: stale Ruffle configuration could not be cleaned: $stale"
-        return 0
-    fi
-    cleaned="$STATE_DIR/es-stale-clean.$$"
-    strip_owned_flash_system "$stale" "$cleaned" || { rm -f "$cleaned"; return 1; }
-    if cmp -s "$stale" "$cleaned"; then
-        rm -f "$cleaned"
-        return 0
-    fi
-    backup_config_once "$stale" || { rm -f "$cleaned"; return 1; }
-    replace_config_file "$cleaned" "$stale" || { rm -f "$cleaned"; return 1; }
-    echo "  stale Ruffle Flash block removed: $stale"
+remove_stale_ruffle_flash() {
+    cfg="$1"
+    [ -f "$cfg" ] || return 0
+    [ "$cfg" = "$ES_CFG" ] && return 0
+    is_ruffle_owned_config "$cfg" || return 0
+    cfg_id="$(printf '%s' "$cfg" | tr '/ ' '__')"
+    cleaned="$STATE_DIR/$cfg_id.dedup.$$"
+    strip_flash_system "$cfg" "$cleaned" || return 1
+    backup_config_once "$cfg" || { rm -f "$cleaned"; return 1; }
+    replace_config "$cleaned" "$cfg" || { rm -f "$cleaned"; return 1; }
+    stale_count="$(grep -c '<name>[[:space:]]*flash[[:space:]]*</name>' "$cfg" 2>/dev/null || true)"
+    [ "$stale_count" = "0" ] || return 1
+    printf '%s\n' "$cfg" >> "$STATE_DIR/es-deduplicated.paths" || return 1
+    echo "  removed stale Ruffle Handheld Flash registration: $cfg"
 }
 
 write_emuelec_dropin() {
@@ -552,7 +637,7 @@ write_emuelec_dropin() {
     <fullname>Adobe Flash Player</fullname>
     <path>$flash_xml</path>
     <extension>.swf .SWF</extension>
-    <command>/bin/bash $launch_xml "%ROM_RAW%"</command>
+    <command>/bin/bash &quot;$launch_xml&quot; &quot;%ROM_RAW%&quot;</command>
     <platform>flash</platform>
     <theme>$THEME_TAG</theme>
   </system>
@@ -570,6 +655,37 @@ FLASH_COUNT="$(grep -c '<name>[[:space:]]*flash[[:space:]]*</name>' "$ES_CFG" 2>
 grep -F "<path>$(xml_escape "$FLASHDIR")</path>" "$ES_CFG" >/dev/null || exit 24
 grep -F "$ROM_TOKEN" "$ES_CFG" >/dev/null || exit 25
 grep -F "$ES_LAUNCH" "$ES_CFG" >/dev/null || exit 25
+
+# Old releases could write the same Flash system into both the official and a
+# per-user system list. Some EmulationStation builds merge those inputs, which
+# makes one SWF appear several times in All Games. Remove only configurations
+# that contain a Ruffle Handheld marker or one of its known legacy commands.
+: > "$STATE_DIR/es-deduplicated.paths" || exit 25
+case "$CFW_KEY" in
+    *arkos*|*darkos*)
+        for stale_cfg in \
+            "${RUFFLE_ES_ALT_CONFIG:-}" \
+            /home/ark/.emulationstation/es_systems.cfg \
+            /home/ark/.emulationstation/es_systems_flash.cfg \
+            /etc/emulationstation/es_systems_flash.cfg; do
+            [ -n "$stale_cfg" ] || continue
+            remove_stale_ruffle_flash "$stale_cfg" || {
+                echo "ERROR: could not remove duplicate Flash registration from $stale_cfg"; exit 25;
+            }
+        done
+        ;;
+    *rocknix*|*amberelec*|*351elec*)
+        for stale_cfg in \
+            "${RUFFLE_ES_ALT_CONFIG:-}" \
+            /storage/.config/emulationstation/es_systems_flash.cfg \
+            /storage/.emulationstation/es_systems_flash.cfg; do
+            [ -n "$stale_cfg" ] || continue
+            remove_stale_ruffle_flash "$stale_cfg" || {
+                echo "ERROR: could not remove duplicate Flash registration from $stale_cfg"; exit 25;
+            }
+        done
+        ;;
+esac
 case "$CFW_KEY" in
     *emuelec*)
         grep -F "$ES_LAUNCH" "$ES_CFG" >/dev/null || exit 25
@@ -579,23 +695,6 @@ case "$CFW_KEY" in
             echo "ERROR: the active configuration still contains an obsolete Flash command"
             exit 25
         fi
-        ;;
-esac
-
-case "$CFW_KEY" in
-    *darkos*|*darkosre*|*arkos*)
-        ARKOS_SYSTEM_DIR="${RUFFLE_ARKOS_SYSTEM_DIR:-$(dirname "${RUFFLE_ARKOS_SYSTEM_CONFIG:-/etc/emulationstation/es_systems.cfg}")}"
-        ARKOS_USER_DIR="${RUFFLE_ARKOS_USER_DIR:-$(dirname "${RUFFLE_ARKOS_USER_CONFIG:-/home/ark/.emulationstation/es_systems.cfg}")}"
-        for stale in "$ARKOS_SYSTEM_DIR"/es_systems*.cfg "$ARKOS_USER_DIR"/es_systems*.cfg; do
-            clean_stale_ruffle_config "$stale" || { echo "ERROR: could not clean $stale"; exit 25; }
-        done
-        ;;
-    *amberelec*|*351elec*)
-        AMBER_USER_DIR="${RUFFLE_AMBERELEC_USER_DIR:-$(dirname "$ES_CFG")}"
-        AMBER_CONFIG_DIR="${RUFFLE_AMBERELEC_CONFIG_DIR:-/storage/.config/emulationstation}"
-        for stale in "$AMBER_USER_DIR"/es_systems*.cfg "$AMBER_CONFIG_DIR"/es_systems*.cfg; do
-            clean_stale_ruffle_config "$stale" || { echo "ERROR: could not clean $stale"; exit 25; }
-        done
         ;;
 esac
 
@@ -609,7 +708,9 @@ case "$CFW_KEY" in
         : > "$STATE_DIR/es-dropins.paths" || exit 25
         LEGACY_ES_CFG="${RUFFLE_ES_LEGACY_CONFIG:-/storage/.emulationstation/es_systems.cfg}"
         if [ -f "$LEGACY_ES_CFG" ] && [ "$LEGACY_ES_CFG" != "$ES_CFG" ]; then
-            can_replace_config "$LEGACY_ES_CFG" || { echo "ERROR: EmuELEC persistent configuration cannot be updated: $LEGACY_ES_CFG"; exit 25; }
+            [ -w "$LEGACY_ES_CFG" ] || { echo "ERROR: EmuELEC persistent configuration is not writable: $LEGACY_ES_CFG"; exit 25; }
+            [ -f "$LEGACY_ES_CFG.rufflehandheld-backup" ] || \
+                cp -p "$LEGACY_ES_CFG" "$LEGACY_ES_CFG.rufflehandheld-backup" || exit 25
             patch_es_config "$LEGACY_ES_CFG" || { echo "ERROR: could not synchronize $LEGACY_ES_CFG"; exit 25; }
             LEGACY_FLASH_COUNT="$(grep -c '<name>[[:space:]]*flash[[:space:]]*</name>' "$LEGACY_ES_CFG" 2>/dev/null || true)"
             [ "$LEGACY_FLASH_COUNT" = "1" ] || { echo "ERROR: persistent EmuELEC Flash count is $LEGACY_FLASH_COUNT"; exit 25; }
@@ -636,7 +737,9 @@ printf '%s\n' "$ES_CFG" > "$STATE_DIR/es-config.path" || exit 25
 echo "  frontend adapter: $ES_ADAPTER"
 echo "  active config: $ES_CFG"
 if [ "$ES_COMMAND_STYLE" = "emuelec-v077-simple" ]; then
-    echo "  command: /bin/bash $ES_LAUNCH \"$ROM_TOKEN\""
+    echo "  command: /bin/bash \"$ES_LAUNCH\" \"$ROM_TOKEN\""
+elif [ "$ES_COMMAND_STYLE" = "standard-escaped" ]; then
+    echo "  command: /bin/bash \"$ES_LAUNCH\" --rom-root \"$ROMROOT\" $ROM_TOKEN"
 else
     echo "  command: /bin/bash \"$ES_LAUNCH\" --rom-root \"$ROMROOT\" \"$ROM_TOKEN\""
 fi
@@ -644,7 +747,6 @@ fi
 echo "[5/5] Final layout checks..."
 for executable in "$ENGINE/entrypoint.sh" "$ENGINE/es-launch.sh" "$ENGINE/native-adapter.sh" \
     "$ENGINE/multifile-adapter.sh" "$ENGINE/core/launch.sh" \
-    "$ENGINE/core/native_adaptive/ruffle-native-adaptive.aarch64" \
     "$ENGINE/core/native_v020/ruffle-native.aarch64" \
     "$ENGINE/core/native_multifile/ruffle-native-multifile.aarch64"; do
     [ -x "$executable" ] || { echo "ERROR: not executable: $executable"; exit 26; }
@@ -653,7 +755,7 @@ done
 [ -f "$PROFILEDIR/default.profile" ] || exit 28
 [ -d "$PROFILEDIR/custom" ] || exit 28
 [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
-printf '%s\n' "0.8.26" > "$APP_DIR/installed-version"
+printf '%s\n' "0.8.27" > "$APP_DIR/installed-version"
 sync
 echo "Core installation complete and verified."
 exit 0

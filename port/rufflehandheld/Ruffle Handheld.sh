@@ -1,10 +1,19 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.26 universal installer/repair launcher.
+# Ruffle Handheld v0.8.27 universal installer/repair launcher.
 # Some CFWs export PortMaster launchers to ports_scripts while keeping the
 # application data in ports. Resolve the complete application, not merely a
 # same-named directory which may contain only stale logs.
 
+# PortMaster's NextUI bridge refuses to execute a port without a conventional
+# top-level GAMEDIR declaration. It sets directory/PORTDIR before reading this
+# line, so installed ports resolve through its temporary .ports bind mount.
+# Other CFWs ignore this compatibility declaration.
+GAMEDIR="${PORTDIR:-/${directory:-roms}/ports}/rufflehandheld"
+
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 1
+BASH_BIN="${BASH:-/bin/bash}"
+export RUFFLE_BASH="$BASH_BIN"
+export RUFFLE_LAUNCH_DIR="$SCRIPT_DIR"
 
 valid_app_dir() {
     candidate="$1"
@@ -22,6 +31,7 @@ esac
 
 APP_DIR=""
 for candidate in \
+    "${HM_PORTS_DIR:+$HM_PORTS_DIR/rufflehandheld}" \
     "${ROMROOT_HINT:+$ROMROOT_HINT/ports/rufflehandheld}" \
     "$SCRIPT_DIR/rufflehandheld" \
     "${ROMROOT_HINT:+$ROMROOT_HINT/ports_scripts/rufflehandheld}" \
@@ -47,4 +57,4 @@ fi
 
 PORTS_DIR="$(dirname "$APP_DIR")"
 echo "Ruffle Handheld application resolved at: $APP_DIR"
-exec /bin/bash "$APP_DIR/setup.sh" "$PORTS_DIR"
+exec "$BASH_BIN" "$APP_DIR/setup.sh" "$PORTS_DIR"

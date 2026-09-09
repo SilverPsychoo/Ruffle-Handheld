@@ -2,8 +2,6 @@
 # TrimUI Brick uses D-pad mouse because the device has no analog sticks.
 name=McDonald's Videogame
 aliases=mcdonalds-videogame|mcdonald-s-video-game|mcdonalds-video-game
-engine=adaptive
-force_scale=showall
 mouse_mode=mouse
 mouse_click=a
 
