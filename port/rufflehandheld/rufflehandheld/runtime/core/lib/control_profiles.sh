@@ -78,8 +78,8 @@ rh_valid_keycode() {
 # Frozen frontend uses lowercase/hyphenated GamepadButton names.
 # Physical A is removed from its stock South binding before Ruffle starts.
 # When a profile declares a numeric `south` key, the launcher routes physical A
-# through RightTrigger and this config maps it to that key. With `south=none`, A
-# is available only to an explicit mouse_click helper assignment.
+# through RightTrigger and this config maps it to that key. With `south=none`,
+# A has an effect only when a profile explicitly selects it as mouse_click.
 rh_write_config_ron() {
     profile="$1"; defaults="$2"; output="$3"; swf_name="${4:-movie.swf}"
     [ -f "$defaults" ] || return 2
@@ -101,7 +101,8 @@ rh_write_config_ron() {
 
         # The frozen frontend treats physical A/South as a native click. The
         # launcher always removes that raw binding. A numeric South action is
-        # exposed through the safe RightTrigger route instead.
+        # exposed through the safe RightTrigger route instead; an explicit
+        # profile click is routed separately by the Native launcher.
         legacy_mode="$(rh_profile_raw_value "$profile" native_a_mode 2>/dev/null || true)"
         if [ "$legacy_mode" = "native" ]; then
             val="none"

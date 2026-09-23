@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.27 path adapter.
+# Ruffle Handheld v0.8.32 path adapter.
 # The v0.7.7 runtime layout is reproduced under /tmp without exposing it beside
 # the user's ROMs. Frozen binaries and their expected paths remain unchanged.
 
@@ -32,7 +32,8 @@ done
 
 FLASH_DIR="${RUFFLE_FLASH_DIR:-$ROMROOT/flash}"
 DATA_DIR="${RUFFLE_DATA_DIR:-$ROMROOT/flash_data}"
-mkdir -p "$APP_DIR/logs" "$FLASH_DIR" "$DATA_DIR" || exit 3
+AUX_LOG_DIR="${RUFFLE_AUX_LOG_DIR:-$APP_DIR/logs}"
+mkdir -p "$APP_DIR/logs" "$AUX_LOG_DIR" "$FLASH_DIR" "$DATA_DIR" || exit 3
 
 # A no-space view keeps LD_PRELOAD safe even when Ports or a game path contains
 # spaces. It also presents the exact directory names expected by the frozen
@@ -51,7 +52,7 @@ ln -s "$APP_DIR" "$LAYOUT/app" || exit 3
 ln -s "$FLASH_DIR" "$LAYOUT/flash" || exit 3
 ln -s "$DATA_DIR" "$LAYOUT/flash_data" || exit 3
 ln -s "$LAYOUT/app/profiles" "$LAYOUT/flash_profiles" || exit 3
-ln -s "$LAYOUT/app/logs" "$LAYOUT/flash_runtime/logs" || exit 3
+ln -s "$AUX_LOG_DIR" "$LAYOUT/flash_runtime/logs" || exit 3
 ln -s "$LAYOUT/app/runtime/core/launch.sh" "$LAYOUT/flash_runtime/launch.sh" || exit 3
 ln -s "$LAYOUT/app/runtime/core/lib" "$LAYOUT/flash_runtime/lib" || exit 3
 ln -s "$LAYOUT/app/runtime/native-adapter.sh" \
@@ -67,14 +68,14 @@ ln -s "$LAYOUT/app/runtime/core/native_multifile/ruffle-native-multifile.aarch64
 ln -s "$LAYOUT/app/runtime/core/native_v020/libruffle_cursorfix.aarch64.so" \
     "$COMPAT/runtime/libruffle_cursorfix.aarch64.so" || exit 3
 ln -s "$LAYOUT/app/runtime/core/lib" "$COMPAT/lib" || exit 3
-ln -s "$LAYOUT/app/logs" "$COMPAT/logs" || exit 3
+ln -s "$AUX_LOG_DIR" "$COMPAT/logs" || exit 3
 ln -s "$FLASH_DIR" "$COMPAT/games" || exit 3
 
 export RUFFLE_APP_DIR="$LAYOUT/app"
 export RUFFLE_ROM_ROOT="$ROMROOT"
 export RUFFLE_COMPAT_GAMEDIR="$COMPAT"
 export RUFFLE_DEFAULT_PROFILE="$LAYOUT/flash_profiles/default.profile"
-export RUFFLE_FLASH_LOG="$LAYOUT/app/logs"
+export RUFFLE_FLASH_LOG="$AUX_LOG_DIR"
 export RUFFLE_ADAPTER_TMP="$LAYOUT"
 
 find_portmaster_control() {
@@ -118,7 +119,7 @@ else
     export XDG_DATA_HOME="$LAYOUT/app/runtime/standalone"
 fi
 
-MEMORY_LOG="$APP_DIR/logs/LAST-LAUNCH-MEMORY.log"
+MEMORY_LOG="$AUX_LOG_DIR/LAST-LAUNCH-MEMORY.log"
 {
     echo "Ruffle Handheld launch memory report"
     echo "Date: $(date 2>/dev/null || echo unavailable)"
@@ -138,7 +139,7 @@ LAUNCH_RC=$?
 } >> "$MEMORY_LOG"
 
 if [ "$LAUNCH_RC" -eq 137 ]; then
-    SIGKILL_LOG="$APP_DIR/logs/LAST-SIGKILL-137.log"
+    SIGKILL_LOG="$AUX_LOG_DIR/LAST-SIGKILL-137.log"
     {
         echo "Ruffle Handheld exit 137 diagnostic"
         echo "Exit 137 means SIGKILL; this report does not assume the cause."

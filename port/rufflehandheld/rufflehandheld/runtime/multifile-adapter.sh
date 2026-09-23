@@ -41,6 +41,24 @@ awk '
         next
     }
     /^export SDL_VIDEODRIVER=/ && videoenv { next }
+    /^"\$BIN"$/ {
+        print "case \"${RUFFLE_CFW_NAME:-${CFW_NAME:-}}\" in"
+        print "  [Nn][Ee][Xx][Tt][Uu][Ii])"
+        print "    NEXTUI_DISPLAY_SO=\"${RUFFLE_APP_DIR:?}/runtime/libruffle_nextui_display.aarch64.so\""
+        print "    if [ \"${RUFFLE_NEXTUI_DISPLAY:-1}\" = 0 ]; then"
+        print "      echo '\''[nextui-display] disabled; using original display path'\''"
+        print "      \"$BIN\""
+        print "    elif [ -f \"$NEXTUI_DISPLAY_SO\" ]; then"
+        print "      echo '\''[nextui-display] loading experimental drawable adapter'\''"
+        print "      RUFFLE_NEXTUI_DISPLAY=1 LD_PRELOAD=\"$NEXTUI_DISPLAY_SO${LD_PRELOAD:+:$LD_PRELOAD}\" \"$BIN\""
+        print "    else"
+        print "      echo '\''[nextui-display] adapter missing; using original display path'\''"
+        print "      \"$BIN\""
+        print "    fi ;;"
+        print "  *) \"$BIN\" ;;"
+        print "esac"
+        next
+    }
     { print }
 ' "$CORE" > "$TMP" || exit 4
 chmod +x "$TMP" || exit 4

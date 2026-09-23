@@ -1,7 +1,7 @@
 # Mouse-only: right stick = native cursor; A = profile-controlled click.
-# A clicks only through gptokeyb2; Ruffle receives no A keyboard action.
+# Physical A is routed to Ruffle click only because this profile selects it.
 name=Henry Stickmin - Breaking the Bank
-aliases=henry-stickman-breaking-the-bank|henry-stickmin-breaking-the-bank|breaking-the-bank|henry-stickmin-breaking-bank
+aliases=henry-stickman-breaking-the-bank|henry-stickmin-breaking-the-bank|breaking-the-bank|henry-stickmin-breaking-bank|161792-breaking-the-bank|breakingthebank
 mouse_mode=mouse
 mouse_click=a
 

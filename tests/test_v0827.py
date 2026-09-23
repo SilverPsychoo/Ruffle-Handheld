@@ -68,14 +68,27 @@ class ReleaseTests(unittest.TestCase):
             body = profile.read_text(encoding="utf-8")
             self.assertNotIn("engine=adaptive", body)
             self.assertNotIn("native_a_mode=", body)
+        resolved = run(
+            "bash",
+            "-c",
+            'source "$1"; rh_resolve_profile "$2" "161792_breaking-the-bank"',
+            "ruffle-profile-test",
+            APP_SOURCE / "runtime/core/lib/control_profiles.sh",
+            APP_SOURCE / "profiles",
+        ).stdout.strip()
+        self.assertEqual(Path(resolved).name, "henry-stickmin-breaking-the-bank.profile")
 
-    def test_nextui_log_failure_is_fixed_and_game_reaches_native(self) -> None:
+    def test_nextui_pak_environment_reaches_native(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ruffle_nextui_") as temp:
             root = Path(temp) / "mnt" / "SD CARD"
             ports_rom = root / "Roms" / "2) Ports (PORTS)"
             app = ports_rom / "rufflehandheld"
             pak = root / "Emus" / "tg5040" / "PORTS.pak"
             shutil.copytree(APP_SOURCE, app)
+            # This test executes a host Native stub; use a host copy of the
+            # display hook too. The packaged ARM64 artifact is checked separately.
+            run("cc", "-shared", "-fPIC", "-O2", ROOT / "tools/ruffle_nextui_display.c",
+                "-ldl", "-o", app / "runtime/libruffle_nextui_display.aarch64.so")
             ports_rom.mkdir(parents=True, exist_ok=True)
             launcher = ports_rom / "Ruffle Handheld.sh"
             shutil.copy2(PORT / "Ruffle Handheld.sh", launcher)
@@ -100,7 +113,7 @@ class ReleaseTests(unittest.TestCase):
                 "directory='mnt/SDCARD/.ports_temp'\n"
                 "CFW_NAME=NextUI\nDEVICE_NAME='TrimUI Brick'\nDEVICE_CPU=A133P\nANALOG_STICKS=0\n"
                 f"GPTOKEYB2='{fake_gpt} -1'\n"
-                "get_controls() { sdl_controllerconfig='03000000,test,a:b0,b:b1'; }\n"
+                "get_controls() { sdl_controllerconfig='03000000,test,a:b0,b:b1,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2'; }\n"
                 "pm_platform_helper() { :; }\npm_finish() { :; }\n",
                 encoding="utf-8",
             )
@@ -129,21 +142,73 @@ class ReleaseTests(unittest.TestCase):
             native = app / "runtime/core/native_v020/ruffle-native.aarch64"
             make_executable(
                 native,
-                "#!/bin/bash\nprintf 'native reached\\nSDL=%s\\n' \"${SDL_VIDEODRIVER:-auto}\" > \"$TEST_NATIVE_MARKER\"\n",
+                "#!/bin/bash\nprintf 'native reached\\nSDL=%s\\nMAP=%s\\nMAPFILE=%s\\nEMU=%s\\n' \"${SDL_VIDEODRIVER:-auto}\" \"${SDL_GAMECONTROLLERCONFIG:-missing}\" \"${SDL_GAMECONTROLLERCONFIG_FILE:-missing}\" \"${EMU_DIR:-missing}\" > \"$TEST_NATIVE_MARKER\"\n",
             )
             (app / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so").unlink()
             game = root / "Roms" / "Flash (FLASH)" / "Bejeweled 2.swf"
             game.write_bytes(b"FWS-test")
             env["TEST_NATIVE_MARKER"] = str(native_marker)
             run("bash", flash_pak / "launch.sh", game, env=env)
-            self.assertIn("native reached", native_marker.read_text())
-            self.assertIn("SDL=auto", native_marker.read_text())
+            marker_body = native_marker.read_text()
+            self.assertIn("native reached", marker_body)
+            self.assertIn("SDL=auto", marker_body)
+            self.assertIn("a:b0", marker_body)
+            self.assertIn("rightshoulder:b5", marker_body)
             self.assertEqual(helper_args.read_text().splitlines()[:2], ["-1", "ruffle-native.aarch64"])
             cfg = helper_cfg.read_text()
-            self.assertIn("a = mouse_left", cfg)
-            self.assertIn("up = mouse_movement_up", cfg)
+            self.assertNotIn("mouse_left", cfg)
+            self.assertIn("dpad = mouse_movement", cfg)
+            self.assertNotIn("mouse_movement_up", cfg)
             logs = list((app / "logs").glob("*.log"))
-            self.assertEqual([path.name for path in logs], ["Bejeweled_2.swf.log"])
+            self.assertEqual(sorted(path.name for path in logs), ["Bejeweled_2.swf.log", "LAST-INSTALL.log"])
+            self.assertIn("Installation verified.", (app / "logs/LAST-INSTALL.log").read_text())
+            self.assertFalse((app / "logs/native").exists())
+            self.assertFalse(any(path.name.startswith("LAST-") and path.name != "LAST-INSTALL.log"
+                                 for path in (app / "logs").iterdir()))
+
+            # Hybrid default: physical A keeps its Space action through the
+            # RightShoulder Ruffle slot while physical R1 becomes the one
+            # profile-selected native click. No second uinput pointer clicks.
+            generic = root / "Roms" / "Flash (FLASH)" / "Generic Hybrid.swf"
+            generic.write_bytes(b"FWS-test")
+            run("bash", flash_pak / "launch.sh", generic, env=env)
+            marker_body = native_marker.read_text()
+            self.assertIn("rightshoulder:b0", marker_body)
+            self.assertIn("a:b5", marker_body)
+            cfg = helper_cfg.read_text()
+            self.assertNotIn("mouse_left", cfg)
+            self.assertNotIn("dpad = mouse_movement", cfg)
+            hybrid_log = app / "logs" / "Generic_Hybrid.swf.log"
+            self.assertIn("click-route=native-r1", hybrid_log.read_text())
+            self.assertEqual(
+                sorted(path.name for path in (app / "logs").glob("*.log")),
+                ["Bejeweled_2.swf.log", "Generic_Hybrid.swf.log", "LAST-INSTALL.log"],
+            )
+
+            # NextUI's reference control template uses a DB file and a no-op
+            # get_controls(), not the mapping variable returned on ArkOS.
+            # Exercise standalone FLASH.pak without PORTS.pak's parent env.
+            database = pak / "PortMaster/gamecontrollerdb.txt"
+            database.write_text("03000000,test,a:b0,b:b1\n")
+            control.write_text(
+                '#!/bin/bash\ncontrolfolder="${EMU_DIR:?}"\n'
+                'directory="${TEMP_DATA_DIR:?}"\n'
+                'export SDL_GAMECONTROLLERCONFIG_FILE="$controlfolder/gamecontrollerdb.txt"\n'
+                "CFW_NAME=NextUI\nDEVICE_NAME='TrimUI Brick'\nANALOG_STICKS=0\n"
+                f"GPTOKEYB2='{fake_gpt} -1'\n"
+                "get_controls() { :; }\n"
+                "pm_platform_helper() { :; }\npm_finish() { :; }\n"
+            )
+            for variable in ("EMU_DIR", "TEMP_DATA_DIR", "SDL_GAMECONTROLLERCONFIG", "SDL_GAMECONTROLLERCONFIG_FILE"):
+                env.pop(variable, None)
+            run("bash", flash_pak / "launch.sh", game, env=env, cwd=Path(temp))
+            marker_body = native_marker.read_text()
+            self.assertIn(f"MAPFILE={database}", marker_body)
+            self.assertIn(f"EMU={pak / 'PortMaster'}", marker_body)
+            self.assertIn("MAP=missing", marker_body)
+            self.assertEqual(helper_args.read_text().splitlines()[:2], ["-1", "ruffle-native.aarch64"])
+            # This checks the contract only, not physical cursor movement.
+            self.assertIn("dpad = mouse_movement", helper_cfg.read_text())
 
     def test_emuelec_clean_update_migrates_data_profiles_and_deduplicates(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ruffle emuelec ") as temp:
@@ -276,7 +341,8 @@ class ReleaseTests(unittest.TestCase):
 
     def test_release_layout_permissions_and_lf(self) -> None:
         run("python3", ROOT / "tools/build_release.py", cwd=ROOT)
-        archive = ROOT / "releases/Ruffle-Handheld-v0.8.27-OFFLINE.zip"
+        version = (ROOT / "VERSION").read_text().strip()
+        archive = ROOT / f"releases/Ruffle-Handheld-v{version}-OFFLINE.zip"
         with zipfile.ZipFile(archive) as release:
             names = release.namelist()
             self.assertIn("Ruffle Handheld.sh", names)

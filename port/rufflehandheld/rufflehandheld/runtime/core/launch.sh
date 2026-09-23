@@ -1,7 +1,9 @@
 #!/bin/bash
 # Ruffle Handheld v0.7.7 dispatcher
-# Native controller input + per-game Ruffle profiles + click-only PortMaster helper.
-# v0.8.27 policy: raw physical A is never passed directly to the frozen frontend.
+# Native controller input + per-game profiles + PortMaster hotkey/mouse helper.
+# v0.8.28 policy: raw physical A is never passed directly to the frozen frontend.
+# A profile-selected mouse button is routed to the frontend's own cursor click;
+# this keeps the click at Ruffle's cursor position on Wayland.
 
 ENGINE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)"
 BASH_BIN="${RUFFLE_BASH:-${BASH:-/bin/bash}}"
@@ -65,9 +67,9 @@ if [ -z "$SIDE" ]; then
     done
 fi
 
-# Non-exclusive helper: ONLY injects the configured mouse click and watches the
-# normal Select+Start quit combo. Ruffle itself keeps ownership of sticks, D-pad
-# and all keyboard-profile buttons.
+# Non-exclusive helper: watches the CFW-defined quit combo and supplies D-pad
+# mouse movement on devices without sticks. A mouse click is injected only as a
+# compatibility fallback when no usable SDL binding is exposed by the CFW.
 INPUT_PID=""; INPUT_CFG=""; INPUT_MAP=""
 start_click_helper() {
     proc="$1"; profile="$2"; defaults="$PROFILEDIR/default.profile"
@@ -78,10 +80,9 @@ start_click_helper() {
     [ -n "$click" ] || click="r1"
     case "$click" in a|b|x|y|l1|l2|l3|r1|r2|r3|start|back) ;; none|NONE|None) click="" ;; *) click="r1" ;; esac
     # Old mouse-only profiles used raw Native A and therefore declared no
-    # helper click. Native A is no longer allowed; preserve usability by moving
-    # that old implicit click through the explicit helper during launch without
-    # rewriting user files. A remains the expected click for mouse-only games,
-    # but Ruffle itself no longer receives raw A/South.
+    # explicit click. Preserve usability by treating that legacy declaration as
+    # mouse_click=a without rewriting the user's file. Raw A still stays off for
+    # every profile that does not explicitly request A as its click.
     [ "$legacy_a_mode" = "native" ] && [ -z "$click" ] && click="a"
     : > "$ilog" 2>/dev/null || true
 
@@ -112,6 +113,40 @@ start_click_helper() {
         echo "PortMaster control: unavailable; using executable fallback if present" >> "$ilog"
     fi
 
+    # Prefer the frozen frontend's own click path whenever PortMaster exposed
+    # the physical binding selected by the profile. On Wayland, a mouse click
+    # injected by a second uinput pointer is reported at that pointer's stale
+    # position (commonly 0,0), even though Ruffle's right stick moved its own
+    # cursor elsewhere.
+    native_click=""
+    click_sdl=""
+    case "$click" in
+        a) click_sdl="a" ;;
+        b) click_sdl="b" ;;
+        x) click_sdl="x" ;;
+        y) click_sdl="y" ;;
+        l1) click_sdl="leftshoulder" ;;
+        l2) click_sdl="lefttrigger" ;;
+        l3) click_sdl="leftstick" ;;
+        r1) click_sdl="rightshoulder" ;;
+        r2) click_sdl="righttrigger" ;;
+        r3) click_sdl="rightstick" ;;
+        start) click_sdl="start" ;;
+        back) click_sdl="back" ;;
+    esac
+    if [ -n "$click_sdl" ]; then
+        case ",${sdl_controllerconfig:-}," in
+            *",$click_sdl:"*) native_click="$click" ;;
+        esac
+        # Without an explicit database row SDL still provides its normal A
+        # mapping. Keeping this case native preserves mouse-only profiles on
+        # installations that do not have PortMaster.
+        [ -z "${sdl_controllerconfig:-}" ] && [ "$click" = "a" ] && native_click="a"
+    fi
+    helper_click="$click"
+    [ -n "$native_click" ] && helper_click=""
+    RUFFLE_NATIVE_CLICK_BUTTON="${native_click:-none}"; export RUFFLE_NATIVE_CLICK_BUTTON
+
     dpad_mouse=0
     device_key="$(printf '%s %s' "${DEVICE_NAME:-}" "${DEVICE_CPU:-}" | tr '[:upper:]' '[:lower:]')"
     if [ "$mouse_mode" = "mouse" ]; then
@@ -128,12 +163,12 @@ start_click_helper() {
         echo 'overlay = clear'
         echo 'exclusive = false'
         if [ "$dpad_mouse" -eq 1 ]; then
-            echo 'up = mouse_movement_up'
-            echo 'down = mouse_movement_down'
-            echo 'left = mouse_movement_left'
-            echo 'right = mouse_movement_right'
+            # The aggregate binding is supported by the gptokeyb2 build in
+            # NextUI/PORTS.pak. Its parser rejects the four directional
+            # mouse_movement_* bindings as unknown keys.
+            echo 'dpad = mouse_movement'
         fi
-        [ -n "$click" ] && printf '%s = mouse_left\n' "$click"
+        [ -n "$helper_click" ] && printf '%s = mouse_left\n' "$helper_click"
     } > "$cfg"
     { echo "=== v0.7.7 input map ==="; cat "$cfg"; echo "=== helper output ==="; } >> "$ilog" 2>&1
 
@@ -150,16 +185,35 @@ start_click_helper() {
         export SDL_GAMECONTROLLERCONFIG_FILE="$INPUT_MAP"
     fi
 
+    helper_proc="$proc"
+    case "$(printf '%s %s' "${RUFFLE_CFW_NAME:-}" "${CFW_NAME:-}" | tr '[:upper:]' '[:lower:]')" in
+        *darkosre*)
+            # R36S device heuristics in control.txt may select L3 as HOTKEY.
+            # This port promises Select+Start; change only this child context.
+            export HOTKEY=back
+            echo 'Quit combo: Select+Start (HOTKEY=back)' >> "$ilog"
+            case " ${GPTOKEYB2:-} " in
+                *' -Z '*)
+                    # procps pkill without -f matches the 15-byte comm field.
+                    # Keep PortMaster's sudo/-Z mode, but provide a matchable
+                    # name for our two frozen executables.
+                    helper_proc="$(printf '%.15s' "$proc")"
+                    echo "Quit target: $helper_proc (kernel process name for $proc)" >> "$ilog"
+                    ;;
+            esac
+            ;;
+    esac
+
     if [ -n "${GPTOKEYB2:-}" ]; then
         echo "Helper command: PortMaster GPTOKEYB2 (native PortMaster kill mode preserved)" >> "$ilog"
         if [ -x "$GPTOKEYB2" ]; then
-            "$GPTOKEYB2" "$proc" -c "$cfg" >> "$ilog" 2>&1 & INPUT_PID=$!
+            "$GPTOKEYB2" "$helper_proc" -c "$cfg" >> "$ilog" 2>&1 & INPUT_PID=$!
         else
             # PortMaster may expose a command plus a device-specific option,
             # for example `-Z` on ROCKNIX. Execute it unchanged: appending `-1`
             # replaced/broke that CFW-specific Start+Select mode.
             # shellcheck disable=SC2086
-            $GPTOKEYB2 "$proc" -c "$cfg" >> "$ilog" 2>&1 & INPUT_PID=$!
+            $GPTOKEYB2 "$helper_proc" -c "$cfg" >> "$ilog" 2>&1 & INPUT_PID=$!
         fi
     elif [ -n "${GPTOKEYB:-}" ]; then
         echo "Helper command: PortMaster GPTOKEYB (native PortMaster kill mode preserved)" >> "$ilog"
@@ -177,8 +231,19 @@ start_click_helper() {
         gptokeyb -1 "$proc" -c "$cfg" >> "$ilog" 2>&1 & INPUT_PID=$!
     fi
     INPUT_CFG="$cfg"
-    RUFFLE_CLICK_BUTTON="${click:-none}"; export RUFFLE_CLICK_BUTTON
-    [ -n "$INPUT_PID" ] && echo "Input helper: click-only PID=$INPUT_PID process=$proc click=${click:-none} exclusive=false" >> "$EARLY" || echo "Input helper: unavailable" >> "$EARLY"
+    if [ -n "$native_click" ]; then
+        RUFFLE_CLICK_BUTTON="native-$native_click"
+    elif [ -n "$helper_click" ]; then
+        RUFFLE_CLICK_BUTTON="helper-$helper_click"
+    else
+        RUFFLE_CLICK_BUTTON="none"
+    fi
+    export RUFFLE_CLICK_BUTTON
+    if [ -n "$INPUT_PID" ]; then
+        echo "Input helper: PID=$INPUT_PID process=$proc click-route=$RUFFLE_CLICK_BUTTON dpad-mouse=$dpad_mouse exclusive=false" >> "$EARLY"
+    else
+        echo "Input helper: unavailable; click-route=$RUFFLE_CLICK_BUTTON" >> "$EARLY"
+    fi
 }
 stop_click_helper() {
     [ -n "$INPUT_PID" ] && kill "$INPUT_PID" 2>/dev/null || true

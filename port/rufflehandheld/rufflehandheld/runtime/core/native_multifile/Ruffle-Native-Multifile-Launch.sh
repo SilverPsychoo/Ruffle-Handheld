@@ -113,30 +113,57 @@ echo "Control profile: $PROFILE_NAME"
 echo "Profile file: $PROFILE"
 
 # Remove the frozen frontend's stock A/South click. If the profile assigns a
-# keyboard key to A, route the physical binding through SDL RightShoulder;
-# config.ron then exposes it as Ruffle RightTrigger. Otherwise A remains
-# available only to gptokeyb2 when mouse_click=a.
-rh_route_profile_a() {
-    route="$1"; mapping="$2"
+# keyboard key to A, route that physical binding through SDL RightShoulder;
+# config.ron then exposes it as Ruffle RightTrigger. Separately, route only the
+# profile-selected click button to SDL A so the click uses Ruffle's own cursor.
+rh_route_profile_input_row() {
+    route="$1"; click="$2"; mapping="$3"
     [ -n "$mapping" ] || { printf '%s' "$mapping"; return 0; }
 
+    click_sdl=""
+    case "$click" in
+        a) click_sdl="a" ;;
+        b) click_sdl="b" ;;
+        x) click_sdl="x" ;;
+        y) click_sdl="y" ;;
+        l1) click_sdl="leftshoulder" ;;
+        l2) click_sdl="lefttrigger" ;;
+        l3) click_sdl="leftstick" ;;
+        r1) click_sdl="rightshoulder" ;;
+        r2) click_sdl="righttrigger" ;;
+        r3) click_sdl="rightstick" ;;
+        start) click_sdl="start" ;;
+        back) click_sdl="back" ;;
+    esac
+
     oldifs="$IFS"; IFS=','
-    a_bind=""
+    a_bind=""; click_bind=""
     for field in $mapping; do
         case "$field" in
             a:*) a_bind="${field#a:}" ;;
         esac
+        if [ -n "$click_sdl" ]; then
+            case "$field" in
+                "$click_sdl":*) click_bind="${field#*:}" ;;
+            esac
+        fi
     done
-
-    # Without a discoverable physical A binding, fail safe and keep mapping.
-    [ -n "$a_bind" ] || { IFS="$oldifs"; printf '%s' "$mapping"; return 0; }
 
     out=""; first=1
     for field in $mapping; do
         case "$field" in
             a:*) continue ;;
+        esac
+        if [ -n "$click_sdl" ] && [ "$click_sdl" != "a" ]; then
+            case "$field" in
+                "$click_sdl":*) continue ;;
+            esac
+        fi
+        case "$field" in
             rightshoulder:*)
-                if [ "$route" = "keyboard" ]; then field="rightshoulder:$a_bind"; else continue; fi
+                if [ "$route" = "keyboard" ] && [ -n "$a_bind" ]; then
+                    field="rightshoulder:$a_bind"
+                fi
                 ;;
         esac
         if [ "$first" -eq 1 ]; then out="$field"; first=0; else out="$out,$field"; fi
@@ -144,10 +171,27 @@ rh_route_profile_a() {
     IFS="$oldifs"
 
     # Some DB rows may not define rightshoulder. Add it for a keyboard action.
-    if [ "$route" = "keyboard" ]; then
+    if [ "$route" = "keyboard" ] && [ -n "$a_bind" ]; then
         case ",$out," in *,rightshoulder:*) ;; *) out="$out,rightshoulder:$a_bind" ;; esac
     fi
-    printf '%s' "$out"
+    if [ -n "$click_bind" ]; then
+        case ",$out," in *,a:*) ;; *) out="$out,a:$click_bind" ;; esac
+    fi
+    # SDL may append crc metadata. Keep the field delimiter or the final
+    # binding becomes a:b5crc:... and SDL rejects that button mapping.
+    printf '%s,' "$out"
+}
+
+# PortMaster may return a database with several GUID rows. Remap each row
+# separately so a binding from another controller cannot replace this one.
+rh_route_profile_input() {
+    local rh_route="$1" rh_click="$2" rh_row
+    while IFS= read -r rh_row || [ -n "$rh_row" ]; do
+        case "$rh_row" in
+            ''|\#*) printf '%s\n' "$rh_row" ;;
+            *) rh_route_profile_input_row "$rh_route" "$rh_click" "$rh_row"; printf '\n' ;;
+        esac
+    done <<< "$3"
 }
 
 A_KEYCODE="$(rh_profile_value "$PROFILE" "$DEFAULT_PROFILE" south 2>/dev/null || true)"
@@ -156,7 +200,7 @@ A_ROUTE="none"
 rh_valid_keycode "$A_KEYCODE" && A_ROUTE="keyboard"
 if [ -n "${sdl_controllerconfig:-}" ]; then
     ORIGINAL_SDL_CONTROLLERCONFIG="$sdl_controllerconfig"
-    sdl_controllerconfig="$(rh_route_profile_a "$A_ROUTE" "$sdl_controllerconfig")"
+    sdl_controllerconfig="$(rh_route_profile_input "$A_ROUTE" "${RUFFLE_NATIVE_CLICK_BUTTON:-none}" "$sdl_controllerconfig")"
 fi
 rh_write_config_ron "$PROFILE" "$DEFAULT_PROFILE" "$DATA_ROOT/config.ron" "movie.swf" || { echo "ERROR: could not build config.ron"; exit 12; }
 if [ "${RUFFLE_DEBUG:-0}" = "1" ]; then
@@ -186,7 +230,7 @@ if [ -f "$CURSOR_SO" ]; then
     export LD_PRELOAD="$CURSOR_SO${LD_PRELOAD:+:$LD_PRELOAD}"
 fi
 
-echo "Input: native gamepad profile | right stick=mouse | click-helper=${RUFFLE_CLICK_BUTTON:-r1}"
+echo "Input: native gamepad profile | right stick=mouse | click-route=${RUFFLE_CLICK_BUTTON:-none}"
 echo "Starting generic multi-file Native binary..."
 cd /tmp || exit 10
 "$BIN"

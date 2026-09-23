@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.27 frontend boundary and per-game log adapter.
+# Ruffle Handheld v0.8.32 frontend boundary and per-game log adapter.
 
 set -u
 RUNTIME_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
@@ -7,6 +7,7 @@ APP_DIR="$(dirname "$RUNTIME_DIR")"
 BASH_BIN="${RUFFLE_BASH:-${BASH:-/bin/bash}}"
 LOGDIR="$APP_DIR/logs"
 mkdir -p "$LOGDIR" || exit 3
+AUXDIR="/tmp/ruffle_handheld_logs_${UID:-0}_$$"
 
 BASE="launch-error"
 for arg in "$@"; do
@@ -30,6 +31,7 @@ cleanup_auxiliary_logs() {
         [ -f "$duplicate" ] && rm -f "$duplicate"
     done
     rmdir "$LOGDIR/native" 2>/dev/null || true
+    [ -d "$AUXDIR" ] && rm -rf "$AUXDIR" 2>/dev/null || true
 }
 
 append_diagnostic() {
@@ -44,9 +46,11 @@ append_diagnostic() {
 }
 
 cleanup_auxiliary_logs
+mkdir -p "$AUXDIR" || exit 3
+export RUFFLE_AUX_LOG_DIR="$AUXDIR"
 
 {
-    echo "Ruffle Handheld per-game log v0.8.27"
+    echo "Ruffle Handheld per-game log v0.8.32"
     echo "Game: $BASE"
     echo "Date: $(date 2>/dev/null || echo unavailable)"
     echo "Script: $0"
@@ -56,13 +60,34 @@ cleanup_auxiliary_logs
     echo
 } > "$LOG"
 
+FINALIZED=0
+ENTRYPOINT_RC=""
+finalize_log() {
+    [ "$FINALIZED" -eq 0 ] || return 0
+    FINALIZED=1
+    if [ -n "$ENTRYPOINT_RC" ]; then
+        echo "Entrypoint exit code: $ENTRYPOINT_RC" >> "$LOG"
+    else
+        echo "Entrypoint interrupted before returning an exit code" >> "$LOG"
+    fi
+
+    append_diagnostic "$AUXDIR/FLASH-EARLY.log" "Dispatcher and profile"
+    append_diagnostic "$AUXDIR/input-helper.log" "Input helper"
+    append_diagnostic "$AUXDIR/LAST-LAUNCH-MEMORY.log" "Memory report"
+    append_diagnostic "$AUXDIR/LAST-SIGKILL-137.log" "Exit 137 report"
+    cleanup_auxiliary_logs
+}
+on_exit() {
+    rc=$?
+    trap - EXIT
+    finalize_log
+    exit "$rc"
+}
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 "$BASH_BIN" "$RUNTIME_DIR/entrypoint.sh" "$@" >> "$LOG" 2>&1
 RC=$?
-echo "Entrypoint exit code: $RC" >> "$LOG"
-
-append_diagnostic "$LOGDIR/FLASH-EARLY.log" "Dispatcher and profile"
-append_diagnostic "$LOGDIR/input-helper.log" "Input helper"
-append_diagnostic "$LOGDIR/LAST-LAUNCH-MEMORY.log" "Memory report"
-append_diagnostic "$LOGDIR/LAST-SIGKILL-137.log" "Exit 137 report"
-cleanup_auxiliary_logs
+ENTRYPOINT_RC="$RC"
 exit "$RC"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.27 core installer.
+# Ruffle Handheld v0.8.32 core installer.
 # Registers the frozen v0.7.7 core in-place inside the Ruffle Handheld bundle.
 
 ROMROOT="$1"
@@ -22,7 +22,7 @@ MIGRATED="$APP_DIR/migrated"
 STATE_DIR="${RUFFLE_INSTALL_STATE_DIR:-$APP_DIR/.install-state}"
 mkdir -p "$FLASHDIR" "$DATADIR" "$PROFILEDIR/custom" "$LOGDIR" "$STATE_DIR" || exit 5
 
-# v0.8.27 keeps only one persistent log per game. Remove diagnostic files and
+# v0.8.31 keeps only one persistent log per game. Remove diagnostic files and
 # duplicate per-backend logs left by older releases; games and profiles are not
 # touched. Current per-game logs directly under logs/ are preserved.
 for obsolete_log in \
@@ -54,7 +54,7 @@ for migrated_log in \
     [ -f "$migrated_log" ] && rm -f "$migrated_log"
 done
 
-echo "=== Core install: v0.7.7 binaries under v0.8.27 installer ==="
+echo "=== Core install: v0.7.7 binaries under v0.8.32 installer ==="
 echo "ROM root: $ROMROOT"
 echo "Application: $APP_DIR"
 echo "CFW adapter: $CFW_NAME"
@@ -277,6 +277,12 @@ BASH_BIN="$PORTS_PAK/bin/bash"
 
 export PATH="$PORTS_PAK/PortMaster:$PORTS_PAK/bin:$PATH"
 export LD_LIBRARY_PATH="$PORTS_PAK/lib:/usr/trimui/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# Match PORTS.pak's controller context when launching from a separate PAK.
+# Its generated control.txt may already contain absolute paths; the source
+# template also supports these variables. Do not edit PortMaster's files.
+export EMU_DIR="$PORTS_PAK/PortMaster"
+export TEMP_DATA_DIR="$SDCARD_ROOT/.ports_temp"
+export SDL_GAMECONTROLLERCONFIG_FILE="$EMU_DIR/gamecontrollerdb.txt"
 export XDG_DATA_HOME="$PORTS_PAK"
 export RUFFLE_BASH="$BASH_BIN"
 export RUFFLE_CFW_NAME="NextUI"
@@ -293,7 +299,7 @@ PAK_LAUNCH
         [ -e "$NEXTUI_PAK/background_icon.png" ] || \
             cp "$APP_DIR/theme/background_icon.png" "$NEXTUI_PAK/background_icon.png" || true
         printf '%s\n' "$NEXTUI_PAK" > "$STATE_DIR/nextui-pak.path" || exit 20
-        printf '%s\n' "0.8.27" > "$APP_DIR/installed-version"
+        printf '%s\n' "0.8.32" > "$APP_DIR/installed-version"
         [ -x "$NEXTUI_PAK/launch.sh" ] || exit 26
         [ -d "$FLASHDIR" ] && [ -d "$DATADIR" ] || exit 27
         [ -f "$PROFILEDIR/default.profile" ] || exit 28
@@ -444,7 +450,9 @@ if [ -z "$ES_CFG" ]; then
         "${HOME:-/tmp}/.emulationstation/es_systems.cfg" \
         /storage/.config/emulationstation/es_systems.cfg \
         /storage/.emulationstation/es_systems.cfg \
-        /userdata/system/configs/emulationstation/es_systems.cfg; do
+        /userdata/system/configs/emulationstation/es_systems.cfg \
+        /home/ark/.emulationstation/es_systems.cfg \
+        /etc/emulationstation/es_systems.cfg; do
         can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
     done
 fi
@@ -580,6 +588,8 @@ patch_es_config() {
         print "    <extension>.swf .SWF</extension>"
         if (commandstyle == "emuelec-v077-simple")
           print "    <command>/bin/bash &quot;" entry "&quot; &quot;" romtoken "&quot;</command>"
+        else if (romtoken == "%ROM%")
+          print "    <command>/bin/bash &quot;" entry "&quot; --rom-root &quot;" romroot "&quot; " romtoken "</command>"
         else if (commandstyle == "standard-escaped")
           print "    <command>/bin/bash &quot;" entry "&quot; --rom-root &quot;" romroot "&quot; &quot;" romtoken "&quot;</command>"
         else
@@ -755,7 +765,7 @@ done
 [ -f "$PROFILEDIR/default.profile" ] || exit 28
 [ -d "$PROFILEDIR/custom" ] || exit 28
 [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
-printf '%s\n' "0.8.27" > "$APP_DIR/installed-version"
+printf '%s\n' "0.8.32" > "$APP_DIR/installed-version"
 sync
 echo "Core installation complete and verified."
 exit 0

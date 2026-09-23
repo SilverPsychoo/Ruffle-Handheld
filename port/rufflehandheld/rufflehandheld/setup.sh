@@ -1,8 +1,13 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.27 offline installer wrapper.
+# Ruffle Handheld v0.8.32 offline installer wrapper.
 
-VERSION="0.8.27"
+VERSION="0.8.32"
 APP_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
+# Keep the last installer attempt when a firmware returns straight to Ports.
+# Game logs remain separate and continue to be overwritten per SWF.
+if mkdir -p "$APP_DIR/logs" 2>/dev/null && command -v tee >/dev/null 2>&1; then
+    exec > >(tee "$APP_DIR/logs/LAST-INSTALL.log") 2>&1
+fi
 PORTS_DIR="${1:-$(dirname "$APP_DIR")}" 
 PORTS_DIR="$(CDPATH= cd -- "$PORTS_DIR" 2>/dev/null && pwd -P)" || {
     echo "ERROR: cannot resolve the Ports directory: $PORTS_DIR"
