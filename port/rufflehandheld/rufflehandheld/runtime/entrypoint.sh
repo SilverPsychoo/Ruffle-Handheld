@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.32 path adapter.
+# Ruffle Handheld v0.8.34 path adapter.
 # The v0.7.7 runtime layout is reproduced under /tmp without exposing it beside
 # the user's ROMs. Frozen binaries and their expected paths remain unchanged.
 

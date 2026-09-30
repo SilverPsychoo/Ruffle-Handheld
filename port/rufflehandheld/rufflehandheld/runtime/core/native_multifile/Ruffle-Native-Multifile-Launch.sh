@@ -21,6 +21,16 @@ fi
 source "$controlfolder/control.txt"
 [ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
 type get_controls >/dev/null 2>&1 && get_controls >/dev/null 2>&1 || true
+# Use the database resolved by the dispatcher, including file-only SDL maps.
+if [ -n "${RUFFLE_CONTROLLER_DB:-}" ]; then
+    sdl_controllerconfig="$RUFFLE_CONTROLLER_DB"
+elif [ -z "${sdl_controllerconfig:-}" ]; then
+    if [ -n "${SDL_GAMECONTROLLERCONFIG:-}" ]; then
+        sdl_controllerconfig="$SDL_GAMECONTROLLERCONFIG"
+    elif [ -f "${SDL_GAMECONTROLLERCONFIG_FILE:-$controlfolder/gamecontrollerdb.txt}" ]; then
+        sdl_controllerconfig="$(cat "${SDL_GAMECONTROLLERCONFIG_FILE:-$controlfolder/gamecontrollerdb.txt}")"
+    fi
+fi
 
 GAMEDIR="/${directory:-roms}/ports/ruffle_r36s"
 [ -d "$GAMEDIR" ] || GAMEDIR="/roms/ports/ruffle_r36s"

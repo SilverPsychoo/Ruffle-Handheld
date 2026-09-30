@@ -133,24 +133,33 @@ print(open("/proc/self/comm").read().strip())
                 received = capture.read_text().splitlines()
                 self.assertEqual(received[:3], [hotkey, flag, target])
 
-    def test_blue_rabbit_click_uses_native_a_on_darkos(self):
+    def test_default_click_uses_native_r1_from_every_sdl_mapping_source(self):
         body = (CORE / "launch.sh").read_text()
         functions = body[body.index("start_click_helper() {"):body.index("cleanup_runtime() {")]
-        with tempfile.TemporaryDirectory(prefix="ruffle-blue-rabbit-") as temp:
+        for source in ("portmaster", "env", "file"):
+          with self.subTest(source=source), tempfile.TemporaryDirectory(prefix="ruffle-default-click-") as temp:
             folder = Path(temp)
             helper = folder / "gptokeyb2"
             helper.write_text("#!/bin/bash\nexit 0\n")
             helper.chmod(0o755)
-            (folder / "control.txt").write_text("get_controls() { :; }\n")
+            mapping = "03000000,R36S,a:b0,b:b1,rightshoulder:b5,platform:Linux,"
+            (folder / "gamecontrollerdb.txt").write_text(mapping + "\n")
+            (folder / "control.txt").write_text(
+                "get_controls() { " + (f"sdl_controllerconfig='{mapping}'; " if source == "portmaster" else "") + ":; }\n")
+            setup = {
+                "portmaster": "",
+                "env": f"export SDL_GAMECONTROLLERCONFIG='{mapping}'\n",
+                "file": 'export SDL_GAMECONTROLLERCONFIG_FILE="$3/gamecontrollerdb.txt"\n',
+            }[source]
             script = ('source "$1"\nPROFILEDIR="$2"; LOGDIR="$3"; ROMROOT="$3"; EARLY="$3/early.log"\n'
                       'RUFFLE_PORTMASTER_CONTROL="$3/control.txt"; GPTOKEYB2="$3/gptokeyb2 -Z"\n'
                       'CFW_NAME=dArkOSRE; RUFFLE_CFW_NAME=dArkOSRE\n'
-                      'sdl_controllerconfig="03000000,R36S,a:b0,b:b1,rightshoulder:b5,platform:Linux,"\n'
+                      + setup +
                       'INPUT_PID=""; INPUT_CFG=""; INPUT_MAP=""\n'+functions+
-                      '\nstart_click_helper ruffle-native.aarch64 "$2/blue-rabbit-s-climate-chaos.profile"\n'
-                      'printf "%s\\n%s\\n" "$RUFFLE_NATIVE_CLICK_BUTTON" "$RUFFLE_CLICK_BUTTON"\n'
+                      '\nstart_click_helper ruffle-native.aarch64 "$2/default.profile"\n'
+                      'printf "%s\\n%s\\n%s\\n" "$RUFFLE_NATIVE_CLICK_BUTTON" "$RUFFLE_CLICK_BUTTON" "$RUFFLE_CONTROLLER_DB"\n'
                       'wait "$INPUT_PID"; INPUT_PID=""; stop_click_helper\n')
             result = subprocess.run(["bash", "-c", script, "click-test", str(CORE / "lib/control_profiles.sh"),
                                      str(CORE.parents[1] / "profiles"), temp], check=True, capture_output=True, text=True)
-            self.assertEqual(result.stdout.splitlines()[-2:], ["a", "native-a"])
+            self.assertEqual(result.stdout.splitlines()[-3:], ["r1", "native-r1", mapping])
             self.assertNotIn("mouse_left", (folder / "input-helper.log").read_text())

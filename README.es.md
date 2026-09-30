@@ -2,21 +2,24 @@
 
 [English](README.md)
 
-Juega archivos Flash en consolas Linux ARM64. Ruffle Handheld añade una sección Flash al menú, admite juegos SWF con archivos adicionales y funciona sin conexión. No incluye juegos.
+Juega archivos Flash en consolas Linux ARM64. Ruffle Handheld los integra al menú, admite juegos SWF con archivos adicionales y funciona sin conexión. No incluye juegos.
 
-**Versión actual:** 0.8.33. La configuración más probada es EmuELEC en equipos RK3326. El soporte para otros sistemas todavía se está comprobando con reportes de la comunidad; consulta [Compatibilidad](#compatibilidad).
+**Versión actual:** 0.8.34. La configuración más probada es EmuELEC en equipos RK3326. El soporte para otros sistemas todavía se está comprobando con reportes de la comunidad; consulta [Compatibilidad](#compatibilidad).
 
 ## Instalación
 
-Descarga `Ruffle-Handheld-v0.8.33-OFFLINE.zip` y descomprímelo. Contiene `Ruffle Handheld.sh` y la carpeta `rufflehandheld`.
+Descarga `Ruffle-Handheld-v0.8.34-OFFLINE.zip` y descomprímelo. Contiene `Ruffle Handheld.sh` y la carpeta `rufflehandheld`.
 
 | Sistema | Dónde copiar los archivos |
 | --- | --- |
 | EmuELEC | `Ruffle Handheld.sh` → `ROMS/ports_scripts/`; `rufflehandheld/` → `ROMS/ports/` |
 | ArkOS, dArkOS y otros sistemas con PortMaster | Copia ambos elementos en la ubicación habitual de Ports; conserva el nombre `rufflehandheld` de la carpeta. |
+| muOS | Copia ambos elementos a `ROMS/Ports/` en la tarjeta SD. |
 | NextUI | Copia ambos elementos en la carpeta de juegos Ports (normalmente `Roms/2) Ports (PORTS)/`). Instala antes `PORTS.pak`. |
 
-Ejecuta **Ruffle Handheld** una vez desde el menú Ports. El instalador crea la carpeta de juegos Flash y agrega la sección al menú. No descarga nada. Si Flash no aparece de inmediato, vuelve al menú o reinicia la consola.
+Ejecuta **Ruffle Handheld** una vez desde el menú Ports. El instalador crea la carpeta de juegos Flash y agrega los juegos disponibles al menú. No descarga nada. Si las entradas no aparecen de inmediato, vuelve al menú o reinicia la consola.
+
+En muOS, los juegos aparecen como scripts `Flash - Nombre del juego` dentro de Ports, ya que muOS no usa EmulationStation. Después de agregar archivos SWF nuevos, vuelve a ejecutar el instalador para crear sus entradas.
 
 Para actualizar, copia los archivos nuevos encima de los anteriores y ejecuta **Ruffle Handheld** otra vez. Tus juegos y perfiles en `profiles/custom/` permanecen en su lugar.
 
@@ -36,6 +39,8 @@ ROMS/flash_data/Garfield.files/
 ```
 
 Los archivos adicionales van dentro de `Garfield.files/`. Deja esa carpeta fuera de `flash/` para que el menú muestre solo el juego. Se aceptan extensiones `.swf` y `.SWF`; la compatibilidad varía porque Ruffle aún no admite todas las funciones de Flash.
+
+En muOS, `flash/` y `flash_data/` se crean en la raíz de la tarjeta SD, junto a `ROMS/`.
 
 ## Controles
 
@@ -62,6 +67,7 @@ Para cambiar los controles de un juego, abre `ports/rufflehandheld/profile-maker
 | --- | --- |
 | EmuELEC | Probado en equipo RK3326 ARM64. |
 | ArkOS / dArkOS | Incluye instalación y controles; los reportes de inicio, clic y salida necesitan más pruebas en consola. |
+| muOS en H700 | Crea entradas de juegos en Ports y selecciona el controlador de vídeo `mali`. algunos botones reportados en versiones anteriores siguen en investigación. |
 | ROCKNIX | Se ha confirmado que llega al reproductor en Flip; faltan pruebas de controles y juegos concretos. |
 | NextUI / TrimUI Brick | El instalador y el reproductor se han ejecutado en la consola. El movimiento del cursor y los juegos que ocupan solo un cuarto de pantalla siguen en investigación. |
 | AmberELEC / Knulli / otros sistemas Linux ARM64 | Incluye adaptadores de instalación; el resultado depende de la consola y el firmware. |

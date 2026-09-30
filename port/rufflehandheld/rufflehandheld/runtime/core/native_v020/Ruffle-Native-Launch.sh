@@ -17,6 +17,17 @@ fi
 source "$controlfolder/control.txt"
 [ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
 type get_controls >/dev/null 2>&1 && get_controls
+# The dispatcher already resolved PortMaster's variable, SDL environment and
+# file-only mappings. Keep that choice after sourcing control.txt again here.
+if [ -n "${RUFFLE_CONTROLLER_DB:-}" ]; then
+    sdl_controllerconfig="$RUFFLE_CONTROLLER_DB"
+elif [ -z "${sdl_controllerconfig:-}" ]; then
+    if [ -n "${SDL_GAMECONTROLLERCONFIG:-}" ]; then
+        sdl_controllerconfig="$SDL_GAMECONTROLLERCONFIG"
+    elif [ -f "${SDL_GAMECONTROLLERCONFIG_FILE:-$controlfolder/gamecontrollerdb.txt}" ]; then
+        sdl_controllerconfig="$(cat "${SDL_GAMECONTROLLERCONFIG_FILE:-$controlfolder/gamecontrollerdb.txt}")"
+    fi
+fi
 
 GAMEDIR="/${directory:-roms}/ports/ruffle_r36s"
 [ -d "$GAMEDIR" ] || GAMEDIR="/roms/ports/ruffle_r36s"

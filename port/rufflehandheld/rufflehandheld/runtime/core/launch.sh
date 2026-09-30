@@ -113,6 +113,23 @@ start_click_helper() {
         echo "PortMaster control: unavailable; using executable fallback if present" >> "$ilog"
     fi
 
+    # PortMaster may supply a mapping through get_controls(), an SDL variable,
+    # or only SDL_GAMECONTROLLERCONFIG_FILE (notably on NextUI). Use the same
+    # database to choose the click path and to configure the Native launcher.
+    controller_db="${sdl_controllerconfig:-${SDL_GAMECONTROLLERCONFIG:-}}"
+    if [ -z "$controller_db" ]; then
+        controller_file="${SDL_GAMECONTROLLERCONFIG_FILE:-}"
+        [ -n "$controller_file" ] || controller_file="${controlfolder:-$(dirname "$PMCTRL")}/gamecontrollerdb.txt"
+        [ -f "$controller_file" ] && controller_db="$(cat "$controller_file")"
+    fi
+    if [ -n "$controller_db" ]; then
+        export RUFFLE_CONTROLLER_DB="$controller_db"
+        echo "Controller mapping: $(printf '%s\n' "$controller_db" | grep -c '[^[:space:]]' || true) row(s)" >> "$ilog"
+    else
+        unset RUFFLE_CONTROLLER_DB
+        echo "Controller mapping: unavailable" >> "$ilog"
+    fi
+
     # Prefer the frozen frontend's own click path whenever PortMaster exposed
     # the physical binding selected by the profile. On Wayland, a mouse click
     # injected by a second uinput pointer is reported at that pointer's stale
@@ -135,13 +152,13 @@ start_click_helper() {
         back) click_sdl="back" ;;
     esac
     if [ -n "$click_sdl" ]; then
-        case ",${sdl_controllerconfig:-}," in
+        case ",$controller_db," in
             *",$click_sdl:"*) native_click="$click" ;;
         esac
         # Without an explicit database row SDL still provides its normal A
         # mapping. Keeping this case native preserves mouse-only profiles on
         # installations that do not have PortMaster.
-        [ -z "${sdl_controllerconfig:-}" ] && [ "$click" = "a" ] && native_click="a"
+        [ -z "$controller_db" ] && [ "$click" = "a" ] && native_click="a"
     fi
     helper_click="$click"
     [ -n "$native_click" ] && helper_click=""
@@ -174,14 +191,10 @@ start_click_helper() {
 
     # Give gptokeyb2 the exact controller database discovered by PortMaster.
     # Some CFWs expose only the variable and not a persistent file.
-    if [ -n "${sdl_controllerconfig:-}" ]; then
+    if [ -n "$controller_db" ]; then
         INPUT_MAP="/tmp/ruffle_controller_$$.txt"
-        printf '%s\n' "$sdl_controllerconfig" > "$INPUT_MAP"
-        export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
-        export SDL_GAMECONTROLLERCONFIG_FILE="$INPUT_MAP"
-    elif [ -n "${SDL_GAMECONTROLLERCONFIG:-}" ]; then
-        INPUT_MAP="/tmp/ruffle_controller_$$.txt"
-        printf '%s\n' "$SDL_GAMECONTROLLERCONFIG" > "$INPUT_MAP"
+        printf '%s\n' "$controller_db" > "$INPUT_MAP"
+        export SDL_GAMECONTROLLERCONFIG="$controller_db"
         export SDL_GAMECONTROLLERCONFIG_FILE="$INPUT_MAP"
     fi
 

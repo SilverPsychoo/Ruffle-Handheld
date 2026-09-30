@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.32 core installer.
+# Ruffle Handheld v0.8.34 core installer.
 # Registers the frozen v0.7.7 core in-place inside the Ruffle Handheld bundle.
 
 ROMROOT="$1"
@@ -54,7 +54,7 @@ for migrated_log in \
     [ -f "$migrated_log" ] && rm -f "$migrated_log"
 done
 
-echo "=== Core install: v0.7.7 binaries under v0.8.32 installer ==="
+echo "=== Core install: v0.7.7 binaries under v0.8.34 installer ==="
 echo "ROM root: $ROMROOT"
 echo "Application: $APP_DIR"
 echo "CFW adapter: $CFW_NAME"
@@ -113,6 +113,17 @@ for LEGACY_PROFILES in "$APP_DIR/payload/flash_profiles" "$ROMROOT/flash_profile
     rmdir "$LEGACY_PROFILES" 2>/dev/null || true
   fi
 done
+
+# v0.8.32 bundled a Blue Rabbit override as a temporary click workaround.
+# Remove only that exact shipped file; user-edited profiles remain untouched.
+old_blue_rabbit="$PROFILEDIR/blue-rabbit-s-climate-chaos.profile"
+if [ -f "$old_blue_rabbit" ] && command -v sha256sum >/dev/null 2>&1; then
+    old_blue_rabbit_hash="$(sha256sum "$old_blue_rabbit" | cut -d ' ' -f 1)"
+    if [ "$old_blue_rabbit_hash" = "46122933a022722fe02edef2c9906c8d02d76b857b9c3fdbfc40cf0d00864603" ]; then
+        rm -f "$old_blue_rabbit" || exit 10
+        echo "  removed obsolete bundled Blue Rabbit click override"
+    fi
+fi
 
 retire_identical() {
     old="$1"; current="$2"
@@ -299,7 +310,7 @@ PAK_LAUNCH
         [ -e "$NEXTUI_PAK/background_icon.png" ] || \
             cp "$APP_DIR/theme/background_icon.png" "$NEXTUI_PAK/background_icon.png" || true
         printf '%s\n' "$NEXTUI_PAK" > "$STATE_DIR/nextui-pak.path" || exit 20
-        printf '%s\n' "0.8.32" > "$APP_DIR/installed-version"
+        printf '%s\n' "0.8.34" > "$APP_DIR/installed-version"
         [ -x "$NEXTUI_PAK/launch.sh" ] || exit 26
         [ -d "$FLASHDIR" ] && [ -d "$DATADIR" ] || exit 27
         [ -f "$PROFILEDIR/default.profile" ] || exit 28
@@ -308,6 +319,67 @@ PAK_LAUNCH
         echo "  frontend adapter: nextui-standalone-pak-community-test"
         echo "  Flash PAK: $NEXTUI_PAK"
         echo "  Games: $FLASHDIR"
+        echo "Core installation complete and verified."
+        exit 0
+        ;;
+esac
+
+# muOS launches shell ports from ROMS/Ports and has no EmulationStation list.
+# Create one menu entry per installed SWF instead of writing an ES config.
+case "$CFW_KEY" in
+    *muos*)
+        MUOS_PORTS="${RUFFLE_MUOS_PORTS_DIR:-$ROMROOT/ROMS/Ports}"
+        if [ ! -d "$MUOS_PORTS" ]; then
+            case "$(basename "$(dirname "$APP_DIR")" | tr '[:upper:]' '[:lower:]')" in
+                ports) MUOS_PORTS="$(dirname "$APP_DIR")" ;;
+            esac
+        fi
+        [ -d "$MUOS_PORTS" ] && [ -w "$MUOS_PORTS" ] || {
+            echo "ERROR: muOS Ports folder is missing or not writable: $MUOS_PORTS"
+            exit 21
+        }
+        : > "$STATE_DIR/muos-launchers.paths" || exit 21
+        MUOS_GAME_COUNT=0
+        for game in "$FLASHDIR"/*.swf "$FLASHDIR"/*.SWF; do
+            [ -f "$game" ] || continue
+            game_name="$(basename "$game")"
+            safe_stem="$(printf '%s' "${game_name%.*}" | sed 's/[^a-zA-Z0-9_. -]/_/g; s/^[. ]*//; s/[. ]*$//')"
+            [ -n "$safe_stem" ] || safe_stem="Game"
+            printf -v quoted_game '%q' "$game"
+            launch_base="$MUOS_PORTS/Flash - $safe_stem"
+            launcher="$launch_base.sh"
+            suffix=2
+            while [ -e "$launcher" ] &&
+                  { ! grep -Fqx '# RUFFLE_HANDHELD_MUOS_LAUNCHER' "$launcher" ||
+                    ! grep -Fqx "SWF=$quoted_game" "$launcher"; }; do
+                launcher="$launch_base ($suffix).sh"
+                suffix=$((suffix + 1))
+            done
+            generated="$launcher.ruffle-new.$$"
+            {
+                printf '%s\n' '#!/bin/bash' '# RUFFLE_HANDHELD_MUOS_LAUNCHER'
+                printf 'ROMROOT=%q\nAPP_FALLBACK=%q\nSWF=%q\n' "$ROMROOT" "$APP_DIR" "$game"
+                cat <<'MUOS_LAUNCH'
+PORTS_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
+APP_DIR="$PORTS_DIR/rufflehandheld"
+[ -f "$APP_DIR/runtime/es-launch.sh" ] || APP_DIR="$APP_FALLBACK"
+[ -f "$APP_DIR/runtime/es-launch.sh" ] || { echo 'Ruffle Handheld files are missing'; exit 3; }
+[ -f "$SWF" ] || { echo "SWF not found: $SWF"; exit 4; }
+exec /bin/bash "$APP_DIR/runtime/es-launch.sh" --rom-root "$ROMROOT" "$SWF"
+MUOS_LAUNCH
+            } > "$generated" || { rm -f "$generated"; exit 21; }
+            chmod +x "$generated" && mv -f "$generated" "$launcher" || {
+                rm -f "$generated"
+                echo "ERROR: could not create muOS game launcher: $launcher"
+                exit 21
+            }
+            printf '%s\n' "$launcher" >> "$STATE_DIR/muos-launchers.paths" || exit 21
+            MUOS_GAME_COUNT=$((MUOS_GAME_COUNT + 1))
+        done
+        printf '%s\n' "0.8.34" > "$APP_DIR/installed-version" || exit 21
+        echo "  muOS Ports launchers: $MUOS_GAME_COUNT"
+        echo "  Games: $FLASHDIR"
+        [ "$MUOS_GAME_COUNT" -gt 0 ] || echo "  Add SWF files to $FLASHDIR and run Ruffle Handheld again to create menu entries."
         echo "Core installation complete and verified."
         exit 0
         ;;
@@ -441,7 +513,6 @@ if [ -z "$ES_CFG" ]; then
             ES_ADAPTER="amberelec-overlay-unverified"
             ES_CFG="${RUFFLE_AMBERELEC_ES_CONFIG:-/storage/.emulationstation/es_systems_rufflehandheld.cfg}"
             ;;
-        *muos*) ES_ADAPTER="muos-no-emulationstation-adapter" ;;
     esac
 fi
 if [ -z "$ES_CFG" ]; then
@@ -765,7 +836,7 @@ done
 [ -f "$PROFILEDIR/default.profile" ] || exit 28
 [ -d "$PROFILEDIR/custom" ] || exit 28
 [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
-printf '%s\n' "0.8.32" > "$APP_DIR/installed-version"
+printf '%s\n' "0.8.34" > "$APP_DIR/installed-version"
 sync
 echo "Core installation complete and verified."
 exit 0

@@ -2,21 +2,24 @@
 
 [Español](README.es.md)
 
-Play Flash games on ARM64 Linux handhelds. Ruffle Handheld adds a Flash section to the games menu, supports single-file and multi-file SWF games, and runs without an Internet connection. Games are not included.
+Play Flash games on ARM64 Linux handhelds. Ruffle Handheld adds them to the games menu, supports single-file and multi-file SWF games, and runs without an Internet connection. Games are not included.
 
-**Current version:** 0.8.33. EmuELEC on RK3326 hardware is the most thoroughly tested setup. Other firmware support is still being checked with community reports; see [Compatibility](#compatibility).
+**Current version:** 0.8.34. EmuELEC on RK3326 hardware is the most thoroughly tested setup. Other firmware support is still being checked with community reports; see [Compatibility](#compatibility).
 
 ## Installation
 
-Download `Ruffle-Handheld-v0.8.33-OFFLINE.zip` and extract it. The ZIP contains `Ruffle Handheld.sh` and the `rufflehandheld` folder.
+Download `Ruffle-Handheld-v0.8.34-OFFLINE.zip` and extract it. The ZIP contains `Ruffle Handheld.sh` and the `rufflehandheld` folder.
 
 | System | Where to copy the files |
 | --- | --- |
 | EmuELEC | `Ruffle Handheld.sh` → `ROMS/ports_scripts/`; `rufflehandheld/` → `ROMS/ports/` |
 | ArkOS, dArkOS and other PortMaster systems | Copy both items to the usual Ports location; keep the folder named `rufflehandheld`. |
+| muOS | Copy both items to `ROMS/Ports/` on the SD card. |
 | NextUI | Copy both items to the Ports games folder (usually `Roms/2) Ports (PORTS)/`). Install `PORTS.pak` first. |
 
-Run **Ruffle Handheld** once from the Ports menu. The installer creates the Flash games folder and registers it in the menu. It does not download anything. If Flash does not appear immediately, return to the menu or restart the device.
+Run **Ruffle Handheld** once from the Ports menu. The installer creates the Flash games folder and adds the available games to the menu. It does not download anything. If new entries do not appear immediately, return to the menu or restart the device.
+
+On muOS, Flash games appear as `Flash - Game Name` scripts in Ports because muOS does not use EmulationStation. Add your SWF files and run the installer again to create entries for new games.
 
 To update, copy the new files over the existing ones and run **Ruffle Handheld** again. Your games and profiles in `profiles/custom/` stay in place.
 
@@ -36,6 +39,8 @@ ROMS/flash_data/Garfield.files/
 ```
 
 The extra files go inside `Garfield.files/`. Keep that folder outside `flash/` so the menu shows only the game. Ruffle Handheld accepts `.swf` and `.SWF`; game compatibility varies because not every Flash feature is supported.
+
+On muOS, `flash/` and `flash_data/` are created at the root of the SD card, beside `ROMS/`.
 
 ## Controls
 
@@ -62,6 +67,7 @@ To change controls for a game, open `ports/rufflehandheld/profile-maker.html` in
 | --- | --- |
 | EmuELEC | Tested on RK3326 ARM64 hardware. |
 | ArkOS / dArkOS | Installation and control support included; reports of launch, click and exit issues still need device testing. |
+| muOS on H700 | Creates game scripts in Ports and selects the `mali` video driver.some buttons reported in older builds need further investigation. |
 | ROCKNIX | Reported to reach the game player on Flip; controls and individual games need further testing. |
 | NextUI / TrimUI Brick | Installer and game player have run on the device. Cursor movement and games appearing in a quarter of the screen remain under investigation. |
 | AmberELEC / Knulli / other ARM64 Linux systems | Installation adapters included; results vary by device and firmware. |

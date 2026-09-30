@@ -20,7 +20,6 @@ SOURCE_OUT = RELEASES / f"Ruffle-Handheld-v{VERSION}-SOURCE.zip"
 # Launcher/profile hashes change only for an explicit input release and are
 # still pinned so later edits cannot slip into a build.
 PINNED_RELEASE_FILES = {
-    "profiles/blue-rabbit-s-climate-chaos.profile": "46122933a022722fe02edef2c9906c8d02d76b857b9c3fdbfc40cf0d00864603",
     "profiles/bad-ice-cream-3.profile": "7167edd1f8a0104a45dc46456214437f2a767918cc0568f0ade16b22c67b336c",
     "profiles/bejeweled-2.profile": "7163780b66b477dba19144043ce223592c21e57f53d918e42b9b34900ba176f9",
     "profiles/dad-n-me.profile": "6509fc72a2e76dd9ecba36c1c18e5813e16b126aca74c515678371d3e5a34bed",
@@ -40,12 +39,12 @@ PINNED_RELEASE_FILES = {
     "profiles/tuper-tario-tros.profile": "107da600ef7e9781bf4d92db3aedcd901f3e5c3a1fd93c9ddfb50f99e3711757",
     "profiles/ultimate-flash-sonic.profile": "6eb072b45539a5b01cae2f78709228482b026358b99d2f18cfb05245a3f3003a",
     "profiles/we-dancing-online.profile": "7d396251061c248d652d14218dddde5922207f2d1dc789252262b3c3c12281cb",
-    "runtime/core/launch.sh": "0265870758ea7ef5a9b1858aa94c7b19e5d3c500d347ed86fdf0385c90683f60",
+    "runtime/core/launch.sh": "be5b320109b9f6dda983884510deae634706be6a9183375d01a5b8bd8a58da88",
     "runtime/core/lib/control_profiles.sh": "778a05e43ef461cbc74ff510af01a2a776efbab5b8e7e5fac163a4969243a94b",
     "runtime/core/lib/performance.sh": "baa845c798ad834dc89c9c9c285b09479f0ae8e9cbbb2d67bb1d8db440861eba",
-    "runtime/core/native_multifile/Ruffle-Native-Multifile-Launch.sh": "42bb7b24127a8258304aba13d3d17d3ee187cd15feedbe1552fed18db37c1fa5",
+    "runtime/core/native_multifile/Ruffle-Native-Multifile-Launch.sh": "62981048d54aa9453e63161efdd825ca9a41ad63ae663f7a92386641f7a01958",
     "runtime/core/native_multifile/ruffle-native-multifile.aarch64": "dfbdcbf83883f268eb9a1210a72c5997391ec82b508ce0c3d7f4373ea3005ab5",
-    "runtime/core/native_v020/Ruffle-Native-Launch.sh": "b4d5c1a8bcbe56ecc9d17e05fc3d4b2e8bf83035b64b7afd1c7ce5a170c7d0ad",
+    "runtime/core/native_v020/Ruffle-Native-Launch.sh": "0ff5671a8b84c2a721b1335c2caf9dcda531072f2b502f218de63cd7086d90cc",
     "runtime/core/native_v020/libruffle_cursorfix.aarch64.so": "269a60726e78f5a90405c987d296efe762793cd9a5b1a91917f5b3b10860edeb",
     "runtime/core/native_v020/ruffle-native.aarch64": "aa080b95afc09825dfa455094bc54c5a5171a6b3090ab7c2fae898cb0905e320",
     "runtime/libruffle_nextui_display.aarch64.so": "55216eda1932a14379752143c53d07551198908ff199afac4117ad019d2cbc9d",

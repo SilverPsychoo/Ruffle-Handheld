@@ -21,7 +21,7 @@ awk '
         print "  case \"$CFW_VIDEO_KEY\" in"
         print "    *nextui*|*trimui*) unset DISPLAY WAYLAND_DISPLAY SDL_VIDEODRIVER ;;"
         print "    *rocknix*) unset DISPLAY; export SDL_VIDEODRIVER=wayland ;;"
-        print "    *knulli*|*batocera*)"
+        print "    *knulli*|*batocera*|*muos*)"
         print "      CFW_DEVICE_KEY=\"$(printf '\''%s %s'\'' \"${DEVICE_CPU:-}\" \"${DEVICE_NAME:-}\" | tr '\''[:upper:]'\'' '\''[:lower:]'\'')\""
         print "      unset DISPLAY WAYLAND_DISPLAY"
         print "      case \"$CFW_DEVICE_KEY\" in *h700*) export SDL_VIDEODRIVER=mali ;; *) unset SDL_VIDEODRIVER ;; esac"

@@ -189,7 +189,7 @@ class ReleaseTests(unittest.TestCase):
             # get_controls(), not the mapping variable returned on ArkOS.
             # Exercise standalone FLASH.pak without PORTS.pak's parent env.
             database = pak / "PortMaster/gamecontrollerdb.txt"
-            database.write_text("03000000,test,a:b0,b:b1\n")
+            database.write_text("03000000,test,a:b0,b:b1,rightshoulder:b5,\n")
             control.write_text(
                 '#!/bin/bash\ncontrolfolder="${EMU_DIR:?}"\n'
                 'directory="${TEMP_DATA_DIR:?}"\n'
@@ -203,12 +203,21 @@ class ReleaseTests(unittest.TestCase):
                 env.pop(variable, None)
             run("bash", flash_pak / "launch.sh", game, env=env, cwd=Path(temp))
             marker_body = native_marker.read_text()
-            self.assertIn(f"MAPFILE={database}", marker_body)
+            self.assertIn("MAP=03000000,test,b:b1", marker_body)
+            self.assertIn("a:b0", marker_body)
             self.assertIn(f"EMU={pak / 'PortMaster'}", marker_body)
-            self.assertIn("MAP=missing", marker_body)
             self.assertEqual(helper_args.read_text().splitlines()[:2], ["-1", "ruffle-native.aarch64"])
             # This checks the contract only, not physical cursor movement.
             self.assertIn("dpad = mouse_movement", helper_cfg.read_text())
+
+            # A file-only PortMaster mapping must route the default R1 click
+            # through Ruffle's cursor and leave physical A on its Space key.
+            run("bash", flash_pak / "launch.sh", generic, env=env, cwd=Path(temp))
+            marker_body = native_marker.read_text()
+            self.assertIn("a:b5", marker_body)
+            self.assertIn("rightshoulder:b0", marker_body)
+            self.assertNotIn("mouse_left", helper_cfg.read_text())
+            self.assertIn("click-route=native-r1", (app / "logs/Generic_Hybrid.swf.log").read_text())
 
     def test_emuelec_clean_update_migrates_data_profiles_and_deduplicates(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ruffle emuelec ") as temp:
@@ -227,6 +236,17 @@ class ReleaseTests(unittest.TestCase):
             custom = app / "profiles/custom/keep.profile"
             custom.parent.mkdir(exist_ok=True)
             custom.write_text("name=Keep Me\nmouse_click=r1\n", encoding="utf-8")
+            shipped_blue_rabbit = app / "profiles/blue-rabbit-s-climate-chaos.profile"
+            shipped_blue_rabbit.write_text(
+                "# Mouse-driven menus use the frontend cursor and physical A to confirm.\n"
+                "name=Blue Rabbit's Climate Chaos\n"
+                "aliases=blue-rabbits-climate-chaos|blue-rabbit-climate-chaos|blue-rabbit-s-climate-chaos\n"
+                "mouse_mode=mouse\nmouse_click=a\nsouth=none\n\n"
+                "dpad_up=38\ndpad_down=40\ndpad_left=37\ndpad_right=39\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(hashlib.sha256(shipped_blue_rabbit.read_bytes()).hexdigest(),
+                             "46122933a022722fe02edef2c9906c8d02d76b857b9c3fdbfc40cf0d00864603")
             config = Path(temp) / "emulationstation" / "es_systems.cfg"
             config.parent.mkdir()
             config.write_text(
@@ -252,6 +272,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertFalse(old_sidecar.exists())
             self.assertTrue((app / "profiles/my-game.profile").is_file())
             self.assertTrue(custom.is_file())
+            self.assertFalse(shipped_blue_rabbit.exists())
             self.assertFalse((romroot / "flash_runtime").exists())
             for relative, expected in FROZEN.items():
                 self.assertEqual(hashlib.sha256((app / relative).read_bytes()).hexdigest(), expected)
@@ -338,6 +359,64 @@ class ReleaseTests(unittest.TestCase):
             body = log.read_text()
             self.assertIn("Backend: native-multifile", body)
             self.assertIn("/flash_data/Garfield.files", body)
+
+            # The older Bejeweled issue used the single-file path and crashed
+            # before SWF loading because H700 Knulli selected kmsdrm.
+            single_native = app / "runtime/core/native_v020/ruffle-native.aarch64"
+            make_executable(single_native, "#!/bin/bash\nprintf 'SDL=%s\\n' \"${SDL_VIDEODRIVER:-auto}\" > \"$TEST_NATIVE_MARKER\"\n")
+            bejeweled = game.parent / "bejeweled2.swf"
+            bejeweled.write_bytes(b"FWS-test")
+            run("bash", app / "runtime/es-launch.sh", "--rom-root", romroot, bejeweled, env=env)
+            self.assertEqual(marker.read_text().strip(), "SDL=mali")
+            self.assertIn("Control profile: Bejeweled 2", (app / "logs/bejeweled2.swf.log").read_text())
+
+    def test_muos_installs_port_launchers_and_uses_mali_on_h700(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ruffle muos ") as temp:
+            romroot = Path(temp) / "SD card"
+            ports = romroot / "ROMS/Ports"
+            app = ports / "rufflehandheld"
+            shutil.copytree(APP_SOURCE, app)
+            flash = romroot / "flash"
+            flash.mkdir()
+            single = flash / "Alien Hominid.swf"
+            multi = flash / "Garfield.SWF"
+            sidecar = romroot / "flash_data/Garfield.files"
+            original = ports / "Flash - Alien Hominid.sh"
+            original.write_text("#!/bin/bash\necho user script\n")
+            marker = Path(temp) / "muos.marker"
+            for binary in (app / "runtime/core/native_v020/ruffle-native.aarch64",
+                           app / "runtime/core/native_multifile/ruffle-native-multifile.aarch64"):
+                make_executable(binary, "#!/bin/bash\nprintf 'SDL=%s\\n' \"${SDL_VIDEODRIVER:-auto}\" > \"$TEST_NATIVE_MARKER\"\n")
+            env = base_env(RUFFLE_CFW_NAME="muOS", CFW_NAME="muOS", DEVICE_CPU="H700",
+                           RUFFLE_ROM_ROOT=str(romroot), TEST_NATIVE_MARKER=str(marker),
+                           HOME=temp)
+            run("bash", app / "setup.sh", ports, env=env)
+            self.assertEqual(list(ports.glob("Flash - *.sh")), [original])
+            single.write_bytes(b"FWS-test")
+            multi.write_bytes(b"FWS-test")
+            sidecar.mkdir(parents=True)
+            (sidecar / "asset.dat").write_bytes(b"asset")
+            run("bash", app / "setup.sh", ports, env=env)
+            (app / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so").unlink()
+            self.assertEqual(original.read_text(), "#!/bin/bash\necho user script\n")
+            launchers = sorted(ports.glob("Flash - *.sh"))
+            self.assertEqual(len(launchers), 3)
+            self.assertFalse((romroot / "es_systems.cfg").exists())
+            self.assertEqual((app / "installed-version").read_text().strip(), "0.8.34")
+            for launcher in launchers:
+                if launcher == original:
+                    continue
+                try:
+                    run("bash", launcher, env=env)
+                except AssertionError as error:
+                    log = app / "logs" / f"{single.name if 'Alien' in launcher.name else multi.name}.log"
+                    raise AssertionError(f"{error}\n{log.read_text() if log.exists() else 'No game log'}") from error
+                self.assertEqual(marker.read_text().strip(), "SDL=mali")
+                marker.unlink()
+            shutil.copy2(APP_SOURCE / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so",
+                         app / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so")
+            run("bash", app / "setup.sh", ports, env=env)
+            self.assertEqual(len(list(ports.glob("Flash - *.sh"))), 3)
 
     def test_release_layout_permissions_and_lf(self) -> None:
         run("python3", ROOT / "tools/build_release.py", cwd=ROOT)
