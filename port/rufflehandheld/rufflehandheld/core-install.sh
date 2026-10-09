@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.34 core installer.
+# Ruffle Handheld v0.8.35 core installer.
 # Registers the frozen v0.7.7 core in-place inside the Ruffle Handheld bundle.
 
 ROMROOT="$1"
@@ -54,7 +54,7 @@ for migrated_log in \
     [ -f "$migrated_log" ] && rm -f "$migrated_log"
 done
 
-echo "=== Core install: v0.7.7 binaries under v0.8.34 installer ==="
+echo "=== Core install: v0.7.7 binaries under v0.8.35 installer ==="
 echo "ROM root: $ROMROOT"
 echo "Application: $APP_DIR"
 echo "CFW adapter: $CFW_NAME"
@@ -310,7 +310,7 @@ PAK_LAUNCH
         [ -e "$NEXTUI_PAK/background_icon.png" ] || \
             cp "$APP_DIR/theme/background_icon.png" "$NEXTUI_PAK/background_icon.png" || true
         printf '%s\n' "$NEXTUI_PAK" > "$STATE_DIR/nextui-pak.path" || exit 20
-        printf '%s\n' "0.8.34" > "$APP_DIR/installed-version"
+        printf '%s\n' "0.8.35" > "$APP_DIR/installed-version"
         [ -x "$NEXTUI_PAK/launch.sh" ] || exit 26
         [ -d "$FLASHDIR" ] && [ -d "$DATADIR" ] || exit 27
         [ -f "$PROFILEDIR/default.profile" ] || exit 28
@@ -324,8 +324,59 @@ PAK_LAUNCH
         ;;
 esac
 
-# muOS launches shell ports from ROMS/Ports and has no EmulationStation list.
-# Create one menu entry per installed SWF instead of writing an ES config.
+install_ports_launchers() {
+        PORTS_LAUNCH_DIR="$1"
+        [ -d "$PORTS_LAUNCH_DIR" ] && [ -w "$PORTS_LAUNCH_DIR" ] || {
+            echo "ERROR: Ports folder is missing or not writable: $PORTS_LAUNCH_DIR"
+            return 1
+        }
+        : > "$STATE_DIR/ports-launchers.paths" || return 1
+        PORTS_GAME_COUNT=0
+        for game in "$FLASHDIR"/*.swf "$FLASHDIR"/*.SWF; do
+            [ -f "$game" ] || continue
+            game_name="$(basename "$game")"
+            safe_stem="$(printf '%s' "${game_name%.*}" | sed 's/[^a-zA-Z0-9_. -]/_/g; s/^[. ]*//; s/[. ]*$//')"
+            [ -n "$safe_stem" ] || safe_stem="Game"
+            printf -v quoted_game '%q' "$game"
+            launch_base="$PORTS_LAUNCH_DIR/Flash - $safe_stem"
+            launcher="$launch_base.sh"
+            suffix=2
+            while [ -e "$launcher" ] &&
+                  { ! grep -Fqx '# RUFFLE_HANDHELD_PORTS_LAUNCHER' "$launcher" &&
+                    ! grep -Fqx '# RUFFLE_HANDHELD_MUOS_LAUNCHER' "$launcher" ||
+                    ! grep -Fqx "SWF=$quoted_game" "$launcher"; }; do
+                launcher="$launch_base ($suffix).sh"
+                suffix=$((suffix + 1))
+            done
+            generated="$launcher.ruffle-new.$$"
+            {
+                printf '%s\n' '#!/bin/bash' '# RUFFLE_HANDHELD_PORTS_LAUNCHER'
+                printf 'ROMROOT=%q\nAPP_FALLBACK=%q\nSWF=%q\n' "$ROMROOT" "$APP_DIR" "$game"
+                cat <<'PORTS_LAUNCH'
+PORTS_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
+APP_DIR="$PORTS_DIR/rufflehandheld"
+[ -f "$APP_DIR/runtime/es-launch.sh" ] || APP_DIR="$APP_FALLBACK"
+[ -f "$APP_DIR/runtime/es-launch.sh" ] || { echo 'Ruffle Handheld files are missing'; exit 3; }
+[ -f "$SWF" ] || { echo "SWF not found: $SWF"; exit 4; }
+exec /bin/bash "$APP_DIR/runtime/es-launch.sh" --rom-root "$ROMROOT" "$SWF"
+PORTS_LAUNCH
+            } > "$generated" || { rm -f "$generated"; return 1; }
+            chmod +x "$generated" && mv -f "$generated" "$launcher" || {
+                rm -f "$generated"
+                echo "ERROR: could not create Ports game launcher: $launcher"
+                return 1
+            }
+            printf '%s\n' "$launcher" >> "$STATE_DIR/ports-launchers.paths" || return 1
+            PORTS_GAME_COUNT=$((PORTS_GAME_COUNT + 1))
+        done
+        printf '%s\n' "0.8.35" > "$APP_DIR/installed-version" || return 1
+        echo "  Ports game launchers: $PORTS_GAME_COUNT"
+        echo "  Games: $FLASHDIR"
+        [ "$PORTS_GAME_COUNT" -gt 0 ] || echo "  Add SWF files to $FLASHDIR and run Ruffle Handheld again to create menu entries."
+        echo "Core installation complete and verified."
+}
+
+# muOS launches shell scripts from Ports and does not use EmulationStation.
 case "$CFW_KEY" in
     *muos*)
         MUOS_PORTS="${RUFFLE_MUOS_PORTS_DIR:-$ROMROOT/ROMS/Ports}"
@@ -334,53 +385,7 @@ case "$CFW_KEY" in
                 ports) MUOS_PORTS="$(dirname "$APP_DIR")" ;;
             esac
         fi
-        [ -d "$MUOS_PORTS" ] && [ -w "$MUOS_PORTS" ] || {
-            echo "ERROR: muOS Ports folder is missing or not writable: $MUOS_PORTS"
-            exit 21
-        }
-        : > "$STATE_DIR/muos-launchers.paths" || exit 21
-        MUOS_GAME_COUNT=0
-        for game in "$FLASHDIR"/*.swf "$FLASHDIR"/*.SWF; do
-            [ -f "$game" ] || continue
-            game_name="$(basename "$game")"
-            safe_stem="$(printf '%s' "${game_name%.*}" | sed 's/[^a-zA-Z0-9_. -]/_/g; s/^[. ]*//; s/[. ]*$//')"
-            [ -n "$safe_stem" ] || safe_stem="Game"
-            printf -v quoted_game '%q' "$game"
-            launch_base="$MUOS_PORTS/Flash - $safe_stem"
-            launcher="$launch_base.sh"
-            suffix=2
-            while [ -e "$launcher" ] &&
-                  { ! grep -Fqx '# RUFFLE_HANDHELD_MUOS_LAUNCHER' "$launcher" ||
-                    ! grep -Fqx "SWF=$quoted_game" "$launcher"; }; do
-                launcher="$launch_base ($suffix).sh"
-                suffix=$((suffix + 1))
-            done
-            generated="$launcher.ruffle-new.$$"
-            {
-                printf '%s\n' '#!/bin/bash' '# RUFFLE_HANDHELD_MUOS_LAUNCHER'
-                printf 'ROMROOT=%q\nAPP_FALLBACK=%q\nSWF=%q\n' "$ROMROOT" "$APP_DIR" "$game"
-                cat <<'MUOS_LAUNCH'
-PORTS_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
-APP_DIR="$PORTS_DIR/rufflehandheld"
-[ -f "$APP_DIR/runtime/es-launch.sh" ] || APP_DIR="$APP_FALLBACK"
-[ -f "$APP_DIR/runtime/es-launch.sh" ] || { echo 'Ruffle Handheld files are missing'; exit 3; }
-[ -f "$SWF" ] || { echo "SWF not found: $SWF"; exit 4; }
-exec /bin/bash "$APP_DIR/runtime/es-launch.sh" --rom-root "$ROMROOT" "$SWF"
-MUOS_LAUNCH
-            } > "$generated" || { rm -f "$generated"; exit 21; }
-            chmod +x "$generated" && mv -f "$generated" "$launcher" || {
-                rm -f "$generated"
-                echo "ERROR: could not create muOS game launcher: $launcher"
-                exit 21
-            }
-            printf '%s\n' "$launcher" >> "$STATE_DIR/muos-launchers.paths" || exit 21
-            MUOS_GAME_COUNT=$((MUOS_GAME_COUNT + 1))
-        done
-        printf '%s\n' "0.8.34" > "$APP_DIR/installed-version" || exit 21
-        echo "  muOS Ports launchers: $MUOS_GAME_COUNT"
-        echo "  Games: $FLASHDIR"
-        [ "$MUOS_GAME_COUNT" -gt 0 ] || echo "  Add SWF files to $FLASHDIR and run Ruffle Handheld again to create menu entries."
-        echo "Core installation complete and verified."
+        install_ports_launchers "$MUOS_PORTS" || exit 21
         exit 0
         ;;
 esac
@@ -526,6 +531,21 @@ if [ -z "$ES_CFG" ]; then
         /etc/emulationstation/es_systems.cfg; do
         can_replace_config "$candidate" && { ES_CFG="$candidate"; break; }
     done
+fi
+
+# Stock Mod OS reports its underlying Ubuntu name through PortMaster and
+# exposes shell scripts in Roms/PORTS without an EmulationStation system list.
+# Use that existing menu only when no ES config was discovered or requested.
+if [ -z "${RUFFLE_ES_CONFIG:-}" ] && [ ! -f "$ES_CFG" ]; then
+    case "$CFW_KEY" in
+        *ubuntu*|*stock*mod*)
+            STOCK_PORTS="$(dirname "$APP_DIR")"
+            if [ "$(basename "$STOCK_PORTS" | tr '[:upper:]' '[:lower:]')" = ports ]; then
+                install_ports_launchers "$STOCK_PORTS" || exit 21
+                exit 0
+            fi
+            ;;
+    esac
 fi
 
 if [ ! -f "$ES_CFG" ]; then
@@ -836,7 +856,7 @@ done
 [ -f "$PROFILEDIR/default.profile" ] || exit 28
 [ -d "$PROFILEDIR/custom" ] || exit 28
 [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
-printf '%s\n' "0.8.34" > "$APP_DIR/installed-version"
+printf '%s\n' "0.8.35" > "$APP_DIR/installed-version"
 sync
 echo "Core installation complete and verified."
 exit 0

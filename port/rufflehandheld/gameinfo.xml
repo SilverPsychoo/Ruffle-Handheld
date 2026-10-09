@@ -3,7 +3,7 @@
   <game>
     <path>./Ruffle Handheld.sh</path>
     <name>Ruffle Handheld</name>
-    <desc>Sets up the Flash library and bundled Ruffle Handheld runtime.</desc>
+    <desc>Adds your Flash SWF games to the handheld's menu.</desc>
     <genre>Other</genre>
   </game>
 </gameList>

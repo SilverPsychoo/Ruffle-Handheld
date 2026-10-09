@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -402,7 +403,7 @@ class ReleaseTests(unittest.TestCase):
             launchers = sorted(ports.glob("Flash - *.sh"))
             self.assertEqual(len(launchers), 3)
             self.assertFalse((romroot / "es_systems.cfg").exists())
-            self.assertEqual((app / "installed-version").read_text().strip(), "0.8.34")
+            self.assertEqual((app / "installed-version").read_text().strip(), "0.8.35")
             for launcher in launchers:
                 if launcher == original:
                     continue
@@ -415,8 +416,91 @@ class ReleaseTests(unittest.TestCase):
                 marker.unlink()
             shutil.copy2(APP_SOURCE / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so",
                          app / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so")
+            # An update from v0.8.34 must reuse its existing muOS launcher.
+            previous_launcher = next(path for path in launchers if path != original and "Garfield" in path.name)
+            previous_launcher.write_text(previous_launcher.read_text().replace(
+                "# RUFFLE_HANDHELD_PORTS_LAUNCHER", "# RUFFLE_HANDHELD_MUOS_LAUNCHER"))
             run("bash", app / "setup.sh", ports, env=env)
             self.assertEqual(len(list(ports.glob("Flash - *.sh"))), 3)
+            self.assertIn("# RUFFLE_HANDHELD_PORTS_LAUNCHER", previous_launcher.read_text())
+
+    def test_flash_saves_survive_relaunch_for_single_and_multifile_games(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ruffle saves ") as temp:
+            romroot = Path(temp) / "SD card"
+            app = romroot / "ROMS/Ports/rufflehandheld"
+            shutil.copytree(APP_SOURCE, app)
+            flash = romroot / "flash"
+            flash.mkdir()
+            single = flash / "First Game.swf"
+            other = flash / "Second Game.swf"
+            multi = flash / "Third Game.swf"
+            for swf in (single, other, multi):
+                swf.write_bytes(b"FWS-test")
+            sidecar = romroot / "flash_data/Third Game.files"
+            legacy = sidecar / "storage/legacy.sol"
+            legacy.parent.mkdir(parents=True)
+            legacy.write_text("kept")
+            marker = Path(temp) / "native.marker"
+            for binary, storage in (
+                (app / "runtime/core/native_v020/ruffle-native.aarch64", "$PWD/ruffle_data/storage"),
+                (app / "runtime/core/native_multifile/ruffle-native-multifile.aarch64", "/tmp/gdata_/storage"),
+            ):
+                make_executable(binary,
+                    "#!/bin/bash\n"
+                    f'storage="{storage}"\n'
+                    'if [ -f "$storage/progress.sol" ]; then echo old > "$TEST_NATIVE_MARKER"; '
+                    'else echo new > "$TEST_NATIVE_MARKER"; fi\n'
+                    'printf saved > "$storage/progress.sol"\n')
+            (app / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so").unlink()
+            env = base_env(RUFFLE_CFW_NAME="muOS", CFW_NAME="muOS", DEVICE_CPU="H700",
+                           RUFFLE_ROM_ROOT=str(romroot), TEST_NATIVE_MARKER=str(marker), HOME=temp)
+
+            def play(swf: Path, expected: str) -> None:
+                run("bash", app / "runtime/es-launch.sh", "--rom-root", romroot, swf, env=env)
+                self.assertEqual(marker.read_text().strip(), expected)
+                self.assertIn("Flash saves:", (app / "logs" / f"{swf.stem.replace(' ', '_')}.swf.log").read_text())
+
+            play(single, "new")
+            play(single, "old")
+            play(other, "new")
+            play(multi, "new")
+            play(multi, "old")
+            self.assertEqual(legacy.read_text(), "kept")
+            stored = list((romroot / "flash_data/storage").glob("*/progress.sol"))
+            self.assertEqual(len(stored), 3)
+            self.assertEqual(len(list((romroot / "flash_data/storage").glob("*/legacy.sol"))), 1)
+
+    def test_stock_mod_ports_menu_without_es_uses_scripts_and_h700_video(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ruffle stock ") as temp:
+            romroot = Path(temp) / "sdcard/Roms"
+            ports = romroot / "PORTS"
+            app = ports / "rufflehandheld"
+            shutil.copytree(APP_SOURCE, app)
+            game = romroot / "flash" / "Stock Game.swf"
+            game.parent.mkdir()
+            game.write_bytes(b"FWS-test")
+            marker = Path(temp) / "stock.marker"
+            native = app / "runtime/core/native_v020/ruffle-native.aarch64"
+            make_executable(native, '#!/bin/bash\nprintf "SDL=%s\\n" "${SDL_VIDEODRIVER:-auto}" > "$TEST_NATIVE_MARKER"\n')
+            control = ports / "PortMaster/control.txt"
+            control.parent.mkdir()
+            control.write_text("directory='" + str(romroot).lstrip("/") + "'\n"
+                               "CFW_NAME=Ubuntu\nDEVICE_CPU=h700\n"
+                               "get_controls() { :; }\n")
+            env = base_env(RUFFLE_CFW_NAME="Ubuntu 22.04", RUFFLE_ROM_ROOT=str(romroot),
+                           TEST_NATIVE_MARKER=str(marker), HOME=temp)
+            run("bash", app / "setup.sh", ports, env=env)
+            (app / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so").unlink()
+            launcher = ports / "Flash - Stock Game.sh"
+            self.assertTrue(launcher.stat().st_mode & stat.S_IXUSR)
+            self.assertFalse((romroot / "es_systems.cfg").exists())
+            self.assertEqual((app / "installed-version").read_text().strip(), "0.8.35")
+            run("bash", launcher, env=env)
+            self.assertEqual(marker.read_text().strip(), "SDL=mali")
+            shutil.copy2(APP_SOURCE / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so",
+                         app / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so")
+            run("bash", app / "setup.sh", ports, env=env)
+            self.assertEqual(list(ports.glob("Flash - *.sh")), [launcher])
 
     def test_release_layout_permissions_and_lf(self) -> None:
         run("python3", ROOT / "tools/build_release.py", cwd=ROOT)
@@ -435,6 +519,35 @@ class ReleaseTests(unittest.TestCase):
                     self.assertNotIn(b"\r\n", data, info.filename)
                 if info.filename.endswith(".sh") or info.filename.endswith(".aarch64"):
                     self.assertTrue((info.external_attr >> 16) & stat.S_IXUSR, info.filename)
+
+        # PortMaster scans local autoinstall ZIPs for a root .sh and a port
+        # directory; the metadata lives inside that directory in its release
+        # format, with no enclosing source-project directory.
+        pm_archive = ROOT / "releases/rufflehandheld.zip"
+        with zipfile.ZipFile(pm_archive) as release:
+            names = release.namelist()
+            self.assertEqual(len(names), len(set(names)))
+            self.assertIn("Ruffle Handheld.sh", names)
+            self.assertIn("rufflehandheld/port.json", names)
+            self.assertIn("rufflehandheld/gameinfo.xml", names)
+            self.assertIn("rufflehandheld/rufflehandheld.md", names)
+            self.assertIn("rufflehandheld/runtime/save-storage.sh", names)
+            self.assertEqual({name.split("/", 1)[0] for name in names},
+                             {"Ruffle Handheld.sh", "rufflehandheld"})
+            metadata = json.loads(release.read("rufflehandheld/port.json"))
+            self.assertEqual(metadata["name"], pm_archive.name)
+            self.assertEqual(metadata["items"], ["Ruffle Handheld.sh", "rufflehandheld/"])
+            self.assertEqual(metadata["attr"]["arch"], ["aarch64"])
+            self.assertFalse(metadata["attr"]["rtr"])
+            self.assertNotIn("Ruffle-Handheld/", names)
+            with tempfile.TemporaryDirectory(prefix="ruffle portmaster ") as temp:
+                ports = Path(temp) / "SD card/ROMS/Ports"
+                ports.mkdir(parents=True)
+                release.extractall(ports)
+                env = base_env(RUFFLE_CFW_NAME="muOS", CFW_NAME="muOS",
+                               RUFFLE_ROM_ROOT=str(ports.parent.parent), HOME=temp)
+                run("bash", ports / "Ruffle Handheld.sh", env=env)
+                self.assertEqual((ports / "rufflehandheld/installed-version").read_text().strip(), version)
 
 
 if __name__ == "__main__":

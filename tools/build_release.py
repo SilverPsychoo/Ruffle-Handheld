@@ -14,6 +14,7 @@ VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 RELEASES = ROOT / "releases"
 OUT = RELEASES / f"Ruffle-Handheld-v{VERSION}-OFFLINE.zip"
 SOURCE_OUT = RELEASES / f"Ruffle-Handheld-v{VERSION}-SOURCE.zip"
+PORTMASTER_OUT = RELEASES / "rufflehandheld.zip"
 
 # Frozen binaries and the intentionally versioned control layer. The binaries,
 # cursor shim and performance helper remain the physically tested v0.7.7 files.
@@ -93,6 +94,24 @@ def iter_release_files() -> list[tuple[Path, Path]]:
     return files
 
 
+def iter_portmaster_files(files: list[tuple[Path, Path]]) -> list[tuple[Path, Path]]:
+    # PortMaster installs ZIP members relative to its Ports directory. Keep
+    # the launcher at the root and place metadata inside the app directory,
+    # matching the layout of ports built by PortMaster-New.
+    metadata = {
+        "port.json": "port.json",
+        "gameinfo.xml": "gameinfo.xml",
+        "README.md": "rufflehandheld.md",
+    }
+    result = list(files)
+    for source_name, archive_name in metadata.items():
+        source = PORT / source_name
+        if not source.is_file():
+            raise SystemExit(f"Missing PortMaster metadata: {source.relative_to(ROOT)}")
+        result.append((source, Path("rufflehandheld") / archive_name))
+    return result
+
+
 def verify_lf(files: list[tuple[Path, Path]]) -> None:
     text_suffixes = {".sh", ".profile", ".py", ".json", ".xml", ".txt", ".html", ".c", ".md"}
     bad = [str(arc) for src, arc in files if src.suffix.lower() in text_suffixes and b"\r\n" in src.read_bytes()]
@@ -132,12 +151,18 @@ def main() -> None:
     with ZipFile(OUT, "w") as zf:
         for source, archive in files:
             write_member(zf, source, archive)
+    portmaster_files = iter_portmaster_files(files)
+    verify_lf(portmaster_files)
+    with ZipFile(PORTMASTER_OUT, "w") as zf:
+        for source, archive in portmaster_files:
+            write_member(zf, source, archive)
     source_files = iter_source_files()
     verify_lf(source_files)
     with ZipFile(SOURCE_OUT, "w") as zf:
         for source, archive in source_files:
             write_member(zf, source, archive)
     print(OUT)
+    print(PORTMASTER_OUT)
     print(SOURCE_OUT)
 
 

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.34 offline installer wrapper.
+# Ruffle Handheld v0.8.35 offline installer wrapper.
 
-VERSION="0.8.34"
+VERSION="0.8.35"
 APP_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
 # Keep the last installer attempt when a firmware returns straight to Ports.
 # Game logs remain separate and continue to be overwritten per SWF.
@@ -146,6 +146,9 @@ if [ "$IS_NEXTUI" -eq 1 ]; then
     FRONTEND="NextUI/MinUI PAK frontend"
 elif [[ "$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')" == *muos* ]]; then
     FRONTEND="muOS Ports menu"
+elif [[ "$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')" == *ubuntu* ]] &&
+     [[ "$(basename "$PORTS_DIR" | tr '[:upper:]' '[:lower:]')" == ports ]]; then
+    FRONTEND="Ports menu"
 elif command -v pidof >/dev/null 2>&1 && { pidof emulationstation >/dev/null 2>&1 || pidof emulationstation-oga >/dev/null 2>&1 || pidof emustation >/dev/null 2>&1; }; then
     FRONTEND="EmulationStation (running)"
 elif command -v emulationstation >/dev/null 2>&1; then
@@ -338,6 +341,14 @@ else
             ;;
         *nextui*) echo "  NextUI will rescan the new Flash PAK after returning to the menu."; RELOAD_OK=1 ;;
         *muos*) echo "  muOS will show the game scripts in Ports; refresh the menu if needed."; RELOAD_OK=1 ;;
+        *ubuntu*|*stock*mod*)
+            if [ -f "$INSTALL_STATE/ports-launchers.paths" ]; then
+                echo "  Game scripts are available in Ports; refresh the menu if needed."
+                RELOAD_OK=1
+            else
+                echo "  Restart the frontend to show Flash games."
+            fi
+            ;;
         *) echo "  No verified reload adapter for '$CFW_NAME'; restart the frontend manually." ;;
     esac
 fi
@@ -347,13 +358,12 @@ if [ -e "$ROMROOT/flash_runtime" ]; then
     die "the obsolete root-level flash_runtime directory still exists"
 fi
 
+if [ -f "$INSTALL_STATE/ports-launchers.paths" ]; then
+    while IFS= read -r PORTS_LAUNCHER; do
+        [ -x "$PORTS_LAUNCHER" ] || die "a Ports game launcher is missing: $PORTS_LAUNCHER"
+    done < "$INSTALL_STATE/ports-launchers.paths"
+else
 case "$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')" in
-    *muos*)
-        [ -f "$INSTALL_STATE/muos-launchers.paths" ] || die "the muOS game launcher list is missing"
-        while IFS= read -r MUOS_LAUNCHER; do
-            [ -x "$MUOS_LAUNCHER" ] || die "a muOS game launcher is missing: $MUOS_LAUNCHER"
-        done < "$INSTALL_STATE/muos-launchers.paths"
-        ;;
     *nextui*)
         NEXTUI_PAK_RECORD="$INSTALL_STATE/nextui-pak.path"
         [ -f "$NEXTUI_PAK_RECORD" ] || die "the installer did not record the NextUI Flash PAK"
@@ -401,6 +411,7 @@ case "$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')" in
         fi
         ;;
 esac
+fi
 
 echo "Installation verified."
 if [ "$IS_NEXTUI" -eq 1 ]; then

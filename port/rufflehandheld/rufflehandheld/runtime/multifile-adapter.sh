@@ -11,6 +11,11 @@ awk '
     /^GAMEDIR=/ && !gamedir { print "GAMEDIR=\"${RUFFLE_COMPAT_GAMEDIR:?}\""; gamedir=1; next }
     /^FLASHLOG=/ && !flashlog { print "FLASHLOG=\"${RUFFLE_FLASH_LOG:?}\""; flashlog=1; next }
     /^DEFAULT_PROFILE=/ && !profile { print "DEFAULT_PROFILE=\"${RUFFLE_DEFAULT_PROFILE:?}\""; profile=1; next }
+    /^PROFILE_LIB=/ && !saves {
+        print "source \"${RUFFLE_APP_DIR:?}/runtime/save-storage.sh\" || exit 12"
+        print "rh_prepare_save_storage \"$DATA_ROOT\" \"$SWF\" \"${RUFFLE_ROM_ROOT:?}\" || exit 12"
+        saves=1
+    }
     /^unset DISPLAY WAYLAND_DISPLAY/ && !videoenv {
         print "CFW_VIDEO_KEY=\"$(printf '\''%s %s'\'' \"${RUFFLE_CFW_NAME:-}\" \"${CFW_NAME:-}\" | tr '\''[:upper:]'\'' '\''[:lower:]'\'')\""
         print "if [ -n \"${RUFFLE_SDL_VIDEODRIVER:-}\" ]; then"
@@ -22,7 +27,7 @@ awk '
         print "  case \"$CFW_VIDEO_KEY\" in"
         print "    *nextui*|*trimui*) unset DISPLAY WAYLAND_DISPLAY SDL_VIDEODRIVER ;;"
         print "    *rocknix*) unset DISPLAY; export SDL_VIDEODRIVER=wayland ;;"
-        print "    *knulli*|*batocera*|*muos*)"
+        print "    *knulli*|*batocera*|*muos*|*ubuntu*|*stock*mod*)"
         print "      CFW_DEVICE_KEY=\"$(printf '\''%s %s'\'' \"${DEVICE_CPU:-}\" \"${DEVICE_NAME:-}\" | tr '\''[:upper:]'\'' '\''[:lower:]'\'')\""
         print "      unset DISPLAY WAYLAND_DISPLAY"
         print "      case \"$CFW_DEVICE_KEY\" in *h700*) export SDL_VIDEODRIVER=mali ;; *) unset SDL_VIDEODRIVER ;; esac"

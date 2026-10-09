@@ -1,15 +1,17 @@
 {
-    "version": 2,
+    "version": 4,
     "name": "rufflehandheld.zip",
     "items": [
         "Ruffle Handheld.sh",
         "rufflehandheld/"
     ],
-    "items_opt": null,
+    "items_opt": [],
     "attr": {
         "title": "Ruffle Handheld",
-        "desc": "Offline Flash integration for ARM64 Linux handhelds, with frozen v0.7.7 binaries, profile-controlled buttons and a visual offline profile maker.",
-        "inst": "One universal launcher and one application folder. On EmuELEC place the .sh in ports_scripts and rufflehandheld in ports. On NextUI place both in its PORTS ROM folder and run once; setup creates Flash (FLASH) and FLASH.pak. The same offline launcher detects the frontend.",
+        "desc": "Play your Flash SWF games on ARM64 Linux handhelds with controller support.",
+        "desc_md": null,
+        "inst": "Run Ruffle Handheld once from Ports, add your SWF games to the flash folder on your ROM card, and run Ruffle Handheld again to add them to the menu.",
+        "inst_md": null,
         "genres": [
             "other"
         ],
@@ -17,11 +19,15 @@
             "Ruffle Handheld contributors"
         ],
         "image": {},
-        "rtr": true,
-        "runtime": null,
+        "rtr": false,
+        "exp": true,
+        "runtime": [],
+        "store": [],
+        "availability": "full",
         "reqs": [],
         "arch": [
             "aarch64"
-        ]
+        ],
+        "min_glibc": ""
     }
 }
