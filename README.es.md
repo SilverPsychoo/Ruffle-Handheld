@@ -4,19 +4,19 @@
 
 Juega archivos Flash en consolas Linux ARM64. Ruffle Handheld los integra al menú, admite juegos SWF con archivos adicionales y funciona sin conexión. No incluye juegos.
 
-**Versión actual:** 0.8.35. La configuración más probada es EmuELEC en equipos RK3326. El soporte para otros sistemas todavía se está comprobando con reportes de la comunidad; consulta [Compatibilidad](#compatibilidad).
+**Versión de prueba:** 0.8.36-rc4. Los cambios de controles y Knulli necesitan confirmación en consola. La configuración más probada es EmuELEC en equipos RK3326. El soporte para otros sistemas todavía se está comprobando con reportes de la comunidad; consulta [Compatibilidad](#compatibilidad).
 
 ## Instalación
 
 En los sistemas compatibles con PortMaster, descarga `rufflehandheld.zip`, cópialo **sin descomprimir** a la carpeta `autoinstall` de PortMaster y abre PortMaster. Consulta [la ubicación de esa carpeta según tu sistema](https://portmaster.games/faq.html). Después ejecuta **Ruffle Handheld** desde Ports una vez para preparar la biblioteca Flash. El ZIP se puede instalar localmente sin aparecer en el catálogo en línea.
 
-Para instalarlo manualmente, descarga `Ruffle-Handheld-v0.8.35-OFFLINE.zip` y descomprímelo. Contiene `Ruffle Handheld.sh` y la carpeta `rufflehandheld`.
+Para instalarlo manualmente, descarga `Ruffle-Handheld-v0.8.36-rc4-OFFLINE.zip` y descomprímelo. Contiene `Ruffle Handheld.sh` y la carpeta `rufflehandheld`.
 
 | Sistema | Dónde copiar los archivos |
 | --- | --- |
 | EmuELEC | `Ruffle Handheld.sh` → `ROMS/ports_scripts/`; `rufflehandheld/` → `ROMS/ports/` |
 | ArkOS, dArkOS y otros sistemas con PortMaster | Copia ambos elementos en la ubicación habitual de Ports; conserva el nombre `rufflehandheld` de la carpeta. |
-| muOS | Copia ambos elementos a `ROMS/Ports/` en la tarjeta SD. |
+| muOS | `Ruffle Handheld.sh` → `roms/PORTS/`; `rufflehandheld/` → `ports/` en la raíz de la misma tarjeta SD. |
 | Stock Mod OS | Copia ambos elementos a `Roms/PORTS/` en la tarjeta SD. |
 | NextUI | Copia ambos elementos en la carpeta de juegos Ports (normalmente `Roms/2) Ports (PORTS)/`). Instala antes `PORTS.pak`. |
 
@@ -44,7 +44,7 @@ ROMS/flash_data/Garfield.files/
 
 Los archivos adicionales van dentro de `Garfield.files/`. Deja esa carpeta fuera de `flash/` para que el menú muestre solo el juego. Se aceptan extensiones `.swf` y `.SWF`; la compatibilidad varía porque Ruffle aún no admite todas las funciones de Flash.
 
-En muOS, `flash/` y `flash_data/` se crean en la raíz de la tarjeta SD, junto a `ROMS/`.
+En muOS, `flash/` y `flash_data/` se crean en la raíz de la tarjeta SD, junto a `roms/` y `ports/`.
 
 Los juegos que guardan progreso lo conservan en `flash_data/storage/` de la tarjeta de ROMs. Tus partidas permanecen ahí al cerrar el juego o actualizar Ruffle Handheld.
 
@@ -65,7 +65,9 @@ La configuración predeterminada está pensada para juegos que combinan teclado 
 
 Algunos juegos cuentan con perfiles de controles incluidos. En juegos que solo usan ratón, como Bejeweled 2, A sirve para hacer clic. Ruffle Handheld lee el mapeo del mando proporcionado por el sistema, por lo que no debería hacer falta un perfil distinto para cada juego solo para activar el clic de R1. Start+Select está previsto para salir cuando PortMaster lo permite, pero falta confirmarlo en algunos sistemas, incluido dArkOSRE.
 
-Para cambiar los controles de un juego, abre `ports/rufflehandheld/profile-maker.html` en el navegador de tu celular o computadora. Escribe el nombre del SWF, asigna los botones, descarga el archivo `.profile` y cópialo a `ports/rufflehandheld/profiles/custom/`. Funciona sin Internet. Los perfiles personalizados tienen prioridad y se conservan al actualizar.
+Para cambiar los controles de un juego, abre `ports/rufflehandheld/profile-maker.html` en el navegador de tu celular o computadora. Escribe el nombre del SWF, elige el stick del ratón y asigna los botones, descarga el archivo `.profile` y cópialo a `ports/rufflehandheld/profiles/custom/`. Funciona sin Internet. Los perfiles personalizados tienen prioridad y se conservan al actualizar.
+
+El ratón usa el stick derecho de forma predeterminada. Para usar el izquierdo, selecciónalo en el Profile Maker y guarda el perfil del juego. La cruceta mantiene las teclas del perfil.
 
 ## Compatibilidad
 
@@ -83,9 +85,9 @@ Un juego puede fallar por una función de Flash no compatible o por falta de mem
 
 ## Logs y reportes de errores
 
-Si falla la instalación, revisa `ports/rufflehandheld/logs/LAST-INSTALL.log`. Al abrir un juego se crea otro archivo en la misma carpeta con un nombre basado en el SWF, por ejemplo `Fancy_Pants.swf.log`. Cada intento reemplaza el log anterior de ese juego.
+Si falla la instalación, revisa `ports/rufflehandheld/logs/LAST-INSTALL.log`. Al abrir un juego se crea otro archivo en la misma carpeta con un nombre basado en el SWF, por ejemplo `Fancy_Pants.swf.log`. Cada intento reemplaza el log anterior de ese juego. Las líneas `[quit]` registran el auxiliar de salida, el HOTKEY, las asignaciones de Start/Select y su estado durante la partida. Si Start+Select falla, adjunta ese log; cuando gptokeyb2 admite diagnóstico de botones, sus eventos también quedan registrados.
 
-Para reportar un fallo, indica el sistema, modelo de consola, versión de Ruffle Handheld, nombre del juego, qué ocurrió y adjunta el log correspondiente. Una foto o un video corto ayuda cuando el problema es de imagen o controles.
+Para reportar un fallo, indica el sistema, modelo de consola, versión de Ruffle Handheld, nombre del juego, qué ocurrió y adjunta el log correspondiente. Si fallan los controles, adjunta también el `.profile` que estás usando. Una foto o un video corto ayuda cuando el problema es de imagen o controles.
 
 ## Licencias
 

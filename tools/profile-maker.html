@@ -123,6 +123,9 @@
     <h2 data-i18n="buttonsSection">2. Botones</h2>
     <div id="mapGrid" class="map-grid"></div>
     <div class="fields" style="margin-top:16px">
+      <label><span data-i18n="mouseStick">Stick para mover el ratón</span>
+        <select id="mouseStick"></select>
+      </label>
       <label><span data-i18n="mouseClick">Botón para clic izquierdo</span>
         <select id="mouseClick"></select>
       </label>
@@ -169,6 +172,8 @@
       aliasesPlaceholder: 'mi-juego|otro-nombre',
       buttonsSection: '2. Botones',
       mouseClick: 'Botón para clic izquierdo',
+      mouseStick: 'Stick para mover el ratón',
+      stickLeft: 'Izquierdo', stickRight: 'Derecho',
       generatedFilename: 'Nombre del perfil generado',
       saveSection: '3. Guardar',
       saveStep1: 'Descarga el perfil.',
@@ -203,6 +208,8 @@
       aliasesPlaceholder: 'my-game|another-name',
       buttonsSection: '2. Buttons',
       mouseClick: 'Left mouse click button',
+      mouseStick: 'Mouse stick',
+      stickLeft: 'Left', stickRight: 'Right',
       generatedFilename: 'Generated profile filename',
       saveSection: '3. Save',
       saveStep1: 'Download the profile.',
@@ -232,6 +239,7 @@
     ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => [String(letter.charCodeAt(0)), letter]),
     ...'0123456789'.split('').map(number => [String(number.charCodeAt(0)), number])
   ];
+  const stickOptions = [['right', 'stickRight'], ['left', 'stickLeft']];
   const clickOptions = [
     ['r1', 'clickR1'], ['a', 'clickA'], ['b', 'clickB'], ['x', 'clickX'], ['y', 'clickY'],
     ['start', 'clickStart'], ['back', 'clickSelect'], ['none', 'clickNone']
@@ -287,6 +295,7 @@
     grid.append(card);
   }
   populateOptions($('mouseClick'), clickOptions, 'r1');
+  populateOptions($('mouseStick'), stickOptions, 'right');
 
   function oneLine(value) {
     return String(value || '').replace(/[\r\n=]+/g, ' ').trim();
@@ -329,6 +338,7 @@
       `name=${name}`,
       `aliases=${aliases}`,
       `mouse_click=${click}`,
+      `mouse_stick=${$('mouseStick').value}`,
       '',
       `dpad_up=${values.dpad_up}`,
       `dpad_down=${values.dpad_down}`,
@@ -354,6 +364,7 @@
   function applyLanguage(nextLanguage) {
     const oldKeyValues = Object.fromEntries(bindings.map(([id]) => [id, $(id).value]));
     const oldClick = $('mouseClick').value;
+    const oldStick = $('mouseStick').value;
     language = nextLanguage === 'en' ? 'en' : 'es';
     document.documentElement.lang = language;
     document.title = tr('documentTitle');
@@ -364,6 +375,7 @@
     document.querySelectorAll('[data-i18n-aria]').forEach(node => { node.setAttribute('aria-label', tr(node.dataset.i18nAria)); });
     for (const [id] of bindings) populateOptions($(id), keyOptions, oldKeyValues[id]);
     populateOptions($('mouseClick'), clickOptions, oldClick);
+    populateOptions($('mouseStick'), stickOptions, oldStick);
     document.querySelectorAll('[data-language]').forEach(button => {
       button.setAttribute('aria-pressed', String(button.dataset.language === language));
     });
@@ -384,6 +396,7 @@
     $('swfName').value = filename.replace(/\.profile$/i, '') + '.swf';
     $('aliases').value = values.aliases || '';
     $('mouseClick').value = values.mouse_click || 'r1';
+    $('mouseStick').value = stickOptions.some(([value]) => value === values.mouse_stick) ? values.mouse_stick : 'right';
     for (const [id] of bindings) {
       const desired = values[id] || 'none';
       if ([...$(id).options].some(option => option.value === desired)) $(id).value = desired;

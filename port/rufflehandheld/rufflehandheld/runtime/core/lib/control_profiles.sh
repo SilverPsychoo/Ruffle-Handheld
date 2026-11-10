@@ -73,6 +73,59 @@ rh_valid_keycode() {
     case "$1" in ''|none|NONE|None) return 1 ;; *[!0-9]*) return 1 ;; *) [ "$1" -ge 0 ] 2>/dev/null && [ "$1" -le 255 ] 2>/dev/null ;; esac
 }
 
+# SDL accepts a database file directly. Never export a full PortMaster database:
+# Linux limits each environment entry, independently of available memory.
+# Keep a small inline override for firmware with older SDL builds, while both
+# the helper and Native always receive the complete database through its file.
+rh_use_controller_file() {
+    local database="$1" inline="" LC_ALL=C
+    export -n sdl_controllerconfig controller_db RUFFLE_ES_CONTROLLER_DB 2>/dev/null || true
+    unset SDL_GAMECONTROLLERCONFIG RUFFLE_CONTROLLER_DB
+    export SDL_GAMECONTROLLERCONFIG_FILE="$database"
+    IFS= read -r -N 16385 inline < "$database" || true
+    if [ "${#inline}" -le 16384 ]; then
+        export SDL_GAMECONTROLLERCONFIG="$inline"
+        echo "Controller database transport: file; small inline override enabled"
+    else
+        echo "Controller database transport: file only; large inline override omitted"
+    fi
+}
+
+# The frozen frontend moves its cursor with SDL rightx/righty. Route the
+# chosen physical stick there without duplicating its axes onto two actions.
+# Profiles without mouse_stick retain the original right-stick behavior.
+rh_route_mouse_stick() {
+    local mode="$1"
+    case "$mode" in left|right) ;; *) mode=right ;; esac
+    [ "$mode" = "right" ] && { printf '%s\n' "$2"; return 0; }
+    printf '%s\n' "$2" | awk -F, -v mode="$mode" '
+      /^#/ || NF < 3 { print; next }
+      {
+        lx=0; ly=0; rx=0; ry=0
+        for (i=3; i<=NF; i++) {
+          split($i, part, ":"); key=part[1]; sub(/^[+-]/, "", key)
+          if (part[2] == "") continue
+          if (key == "leftx") lx=1
+          if (key == "lefty") ly=1
+          if (key == "rightx") rx=1
+          if (key == "righty") ry=1
+        }
+        swap=(lx && ly && mode == "left")
+        out=$1 "," $2 ","
+        for (i=3; i<=NF; i++) {
+          field=$i
+          if (field == "") continue
+          if (swap) {
+            if (field ~ /^[+-]?left[xy]:/) sub(/left/, "right", field)
+            else if (field ~ /^[+-]?right[xy]:/) continue
+          }
+          out=out field ","
+        }
+        print out
+      }
+    '
+}
+
 # Build config.ron using ONLY the button names accepted by the frozen frontend.
 # Known-good names are inherited from the original working v0.5.x config.
 # Frozen frontend uses lowercase/hyphenated GamepadButton names.

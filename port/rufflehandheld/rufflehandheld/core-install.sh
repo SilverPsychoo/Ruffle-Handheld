@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.35 core installer.
+# Ruffle Handheld v0.8.36-rc4 core installer.
 # Registers the frozen v0.7.7 core in-place inside the Ruffle Handheld bundle.
 
 ROMROOT="$1"
@@ -54,7 +54,7 @@ for migrated_log in \
     [ -f "$migrated_log" ] && rm -f "$migrated_log"
 done
 
-echo "=== Core install: v0.7.7 binaries under v0.8.35 installer ==="
+echo "=== Core install: v0.7.7 binaries under v0.8.36-rc4 installer ==="
 echo "ROM root: $ROMROOT"
 echo "Application: $APP_DIR"
 echo "CFW adapter: $CFW_NAME"
@@ -228,6 +228,7 @@ for required in \
     "$ENGINE/core/launch.sh" \
     "$ENGINE/es-launch.sh" \
     "$ENGINE/core/lib/control_profiles.sh" \
+    "$ENGINE/core/lib/quit_diagnostics.sh" \
     "$ENGINE/core/lib/performance.sh" \
     "$ENGINE/core/native_v020/Ruffle-Native-Launch.sh" \
     "$ENGINE/core/native_v020/libruffle_cursorfix.aarch64.so" \
@@ -310,7 +311,7 @@ PAK_LAUNCH
         [ -e "$NEXTUI_PAK/background_icon.png" ] || \
             cp "$APP_DIR/theme/background_icon.png" "$NEXTUI_PAK/background_icon.png" || true
         printf '%s\n' "$NEXTUI_PAK" > "$STATE_DIR/nextui-pak.path" || exit 20
-        printf '%s\n' "0.8.35" > "$APP_DIR/installed-version"
+        printf '%s\n' "0.8.36-rc4" > "$APP_DIR/installed-version"
         [ -x "$NEXTUI_PAK/launch.sh" ] || exit 26
         [ -d "$FLASHDIR" ] && [ -d "$DATADIR" ] || exit 27
         [ -f "$PROFILEDIR/default.profile" ] || exit 28
@@ -354,8 +355,8 @@ install_ports_launchers() {
                 printf 'ROMROOT=%q\nAPP_FALLBACK=%q\nSWF=%q\n' "$ROMROOT" "$APP_DIR" "$game"
                 cat <<'PORTS_LAUNCH'
 PORTS_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
-APP_DIR="$PORTS_DIR/rufflehandheld"
-[ -f "$APP_DIR/runtime/es-launch.sh" ] || APP_DIR="$APP_FALLBACK"
+APP_DIR="$APP_FALLBACK"
+[ -f "$APP_DIR/runtime/es-launch.sh" ] || APP_DIR="$PORTS_DIR/rufflehandheld"
 [ -f "$APP_DIR/runtime/es-launch.sh" ] || { echo 'Ruffle Handheld files are missing'; exit 3; }
 [ -f "$SWF" ] || { echo "SWF not found: $SWF"; exit 4; }
 exec /bin/bash "$APP_DIR/runtime/es-launch.sh" --rom-root "$ROMROOT" "$SWF"
@@ -369,7 +370,7 @@ PORTS_LAUNCH
             printf '%s\n' "$launcher" >> "$STATE_DIR/ports-launchers.paths" || return 1
             PORTS_GAME_COUNT=$((PORTS_GAME_COUNT + 1))
         done
-        printf '%s\n' "0.8.35" > "$APP_DIR/installed-version" || return 1
+        printf '%s\n' "0.8.36-rc4" > "$APP_DIR/installed-version" || return 1
         echo "  Ports game launchers: $PORTS_GAME_COUNT"
         echo "  Games: $FLASHDIR"
         [ "$PORTS_GAME_COUNT" -gt 0 ] || echo "  Add SWF files to $FLASHDIR and run Ruffle Handheld again to create menu entries."
@@ -379,11 +380,16 @@ PORTS_LAUNCH
 # muOS launches shell scripts from Ports and does not use EmulationStation.
 case "$CFW_KEY" in
     *muos*)
-        MUOS_PORTS="${RUFFLE_MUOS_PORTS_DIR:-$ROMROOT/ROMS/Ports}"
-        if [ ! -d "$MUOS_PORTS" ]; then
-            case "$(basename "$(dirname "$APP_DIR")" | tr '[:upper:]' '[:lower:]')" in
-                ports) MUOS_PORTS="$(dirname "$APP_DIR")" ;;
-            esac
+        MUOS_PORTS="${RUFFLE_MUOS_PORTS_DIR:-}"
+        if [ -z "$MUOS_PORTS" ]; then
+            for roms_name in roms ROMS Roms; do
+                for ports_name in PORTS Ports ports; do
+                    candidate="$ROMROOT/$roms_name/$ports_name"
+                    if [ -d "$candidate" ]; then MUOS_PORTS="$candidate"; break 2; fi
+                done
+            done
+            [ -n "$MUOS_PORTS" ] || MUOS_PORTS="$ROMROOT/roms/PORTS"
+            mkdir -p "$MUOS_PORTS" || exit 21
         fi
         install_ports_launchers "$MUOS_PORTS" || exit 21
         exit 0
@@ -582,6 +588,7 @@ case "$CFW_KEY" in
         ES_LAUNCH="$ENGINE/es-launch.sh"
         ES_COMMAND_STYLE="emuelec-v077-simple"
         ;;
+    *knulli*|*batocera*) ES_COMMAND_STYLE="knulli-controllers" ;;
 esac
 
 echo "[3/5] Integrating the active theme conservatively..."
@@ -679,6 +686,10 @@ patch_es_config() {
         print "    <extension>.swf .SWF</extension>"
         if (commandstyle == "emuelec-v077-simple")
           print "    <command>/bin/bash &quot;" entry "&quot; &quot;" romtoken "&quot;</command>"
+        else if (commandstyle == "knulli-controllers") {
+          print "    <command>/bin/bash &quot;" entry "&quot; --rom-root &quot;" romroot "&quot; " romtoken " --es-controllers %CONTROLLERSCONFIG%</command>"
+          print "    <emulators/>"
+        }
         else if (romtoken == "%ROM%")
           print "    <command>/bin/bash &quot;" entry "&quot; --rom-root &quot;" romroot "&quot; " romtoken "</command>"
         else if (commandstyle == "standard-escaped")
@@ -856,7 +867,7 @@ done
 [ -f "$PROFILEDIR/default.profile" ] || exit 28
 [ -d "$PROFILEDIR/custom" ] || exit 28
 [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
-printf '%s\n' "0.8.35" > "$APP_DIR/installed-version"
+printf '%s\n' "0.8.36-rc4" > "$APP_DIR/installed-version"
 sync
 echo "Core installation complete and verified."
 exit 0

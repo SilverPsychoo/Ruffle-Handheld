@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.35 universal installer/repair launcher.
+# Ruffle Handheld v0.8.36-rc4 universal installer/repair launcher.
 # Some CFWs export PortMaster launchers to ports_scripts while keeping the
 # application data in ports. Resolve the complete application, not merely a
 # same-named directory which may contain only stale logs.
@@ -25,16 +25,24 @@ valid_app_dir() {
 }
 
 ROMROOT_HINT=""
-case "$(basename "$SCRIPT_DIR")" in
+MUOS_SD_ROOT=""
+case "$(basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]')" in
     ports|ports_scripts) ROMROOT_HINT="$(dirname "$SCRIPT_DIR")" ;;
 esac
+if [ "$(basename "$ROMROOT_HINT" | tr '[:upper:]' '[:lower:]')" = roms ]; then
+    MUOS_SD_ROOT="$(dirname "$ROMROOT_HINT")"
+fi
 
 APP_DIR=""
 for candidate in \
     "${HM_PORTS_DIR:+$HM_PORTS_DIR/rufflehandheld}" \
+    "${MUOS_SD_ROOT:+$MUOS_SD_ROOT/ports/rufflehandheld}" \
     "${ROMROOT_HINT:+$ROMROOT_HINT/ports/rufflehandheld}" \
     "$SCRIPT_DIR/rufflehandheld" \
     "${ROMROOT_HINT:+$ROMROOT_HINT/ports_scripts/rufflehandheld}" \
+    /mnt/sdcard/ports/rufflehandheld \
+    /mnt/mmc/ports/rufflehandheld \
+    /mnt/union/ports/rufflehandheld \
     /storage/roms/ports/rufflehandheld \
     /storage/roms2/ports/rufflehandheld \
     /roms/ports/rufflehandheld \
@@ -52,6 +60,7 @@ if [ -z "$APP_DIR" ]; then
     echo "Ruffle Handheld setup files were not found."
     echo "Checked complete installations under both ports/ and ports_scripts/."
     echo "On EmuELEC put this .sh in ports_scripts/ and the rufflehandheld folder in ports/."
+    echo "On muOS put this .sh in roms/PORTS/ and the rufflehandheld folder in ports/ at the SD root."
     exit 1
 fi
 

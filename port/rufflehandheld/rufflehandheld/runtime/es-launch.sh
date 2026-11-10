@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.35 frontend boundary and per-game log adapter.
+# Ruffle Handheld v0.8.36-rc4 frontend boundary and per-game log adapter.
 
 set -u
 RUNTIME_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
@@ -48,9 +48,10 @@ append_diagnostic() {
 cleanup_auxiliary_logs
 mkdir -p "$AUXDIR" || exit 3
 export RUFFLE_AUX_LOG_DIR="$AUXDIR"
+export RUFFLE_GAME_LOG="$LOG"
 
 {
-    echo "Ruffle Handheld per-game log v0.8.35"
+    echo "Ruffle Handheld per-game log v0.8.36-rc4"
     echo "Game: $BASE"
     echo "Date: $(date 2>/dev/null || echo unavailable)"
     echo "Script: $0"
@@ -87,7 +88,29 @@ trap on_exit EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-"$BASH_BIN" "$RUNTIME_DIR/entrypoint.sh" "$@" >> "$LOG" 2>&1
+# Only Knulli/Batocera registrations append this marker. Keep the controller
+# arguments separate from SWF paths and use a launch-local mapping, never a
+# stale /tmp/gamecontrollerdb.txt left by a previously opened port.
+GAME_ARGS=(); CONTROLLER_ARGS=(); READ_CONTROLLERS=0
+for arg in "$@"; do
+    if [ "$arg" = "--es-controllers" ]; then
+        READ_CONTROLLERS=1
+    elif [ "$READ_CONTROLLERS" -eq 1 ]; then
+        CONTROLLER_ARGS+=("$arg")
+    else
+        GAME_ARGS+=("$arg")
+    fi
+done
+unset RUFFLE_ES_CONTROLLER_DB
+if [ "$READ_CONTROLLERS" -eq 1 ]; then
+    if ES_MAPPING="$(python3 "$RUNTIME_DIR/knulli-input.py" "${CONTROLLER_ARGS[@]}" 2>> "$LOG")" && [ -n "$ES_MAPPING" ]; then
+        export RUFFLE_ES_CONTROLLER_DB="$ES_MAPPING"
+    else
+        echo "WARNING: frontend controller mapping unavailable; trying PortMaster/SDL defaults" >> "$LOG"
+    fi
+fi
+
+"$BASH_BIN" "$RUNTIME_DIR/entrypoint.sh" "${GAME_ARGS[@]}" >> "$LOG" 2>&1
 RC=$?
 ENTRYPOINT_RC="$RC"
 exit "$RC"

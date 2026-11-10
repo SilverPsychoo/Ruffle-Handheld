@@ -13,7 +13,7 @@ LAUNCHERS = [CORE / "native_v020/Ruffle-Native-Launch.sh",
              CORE / "native_multifile/Ruffle-Native-Multifile-Launch.sh"]
 GUID1 = "19003982010000008811000088010000"
 GUID2 = "030000005e0400008e02000000000000"
-DB = (f"{GUID1},r36s_Gamepad,a:b0,b:b1,rightshoulder:b5,dpup:h0.1,platform:Linux,\n"
+DB = (f"{GUID1},r36s_Gamepad,a:b0,b:b1,x:b2,y:b3,rightshoulder:b5,dpup:h0.1,platform:Linux,\n"
       f"{GUID2},Second Controller,a:b2,b:b3,rightshoulder:b7,dpup:h0.1,platform:Linux,\n")
 
 def route(launcher, mode, click, db):
@@ -49,7 +49,7 @@ class ControllerRouting(unittest.TestCase):
             for row, a in zip(rows, ["b0", "b2"]):
                 self.assertEqual(fields(row).get("a"), a)
 
-    def test_sdl_virtual_controller_click_is_delivered(self):
+    def test_sdl_virtual_controller_click_and_action_buttons_are_delivered(self):
         library = ctypes.util.find_library("SDL2-2.0")
         if not library:
             self.skipTest("host SDL2 unavailable; requires host SDL2, never a console dependency")
@@ -80,7 +80,7 @@ class ControllerRouting(unittest.TestCase):
             sdl.SDL_JoystickGetGUIDString(sdl.SDL_JoystickGetGUID(joystick), guid, 33)
             database = DB.replace(GUID1, guid.value.decode())
             for launcher in LAUNCHERS:
-                for row in route(launcher, "none", "r1", database).strip().splitlines():
+                for row in route(launcher, "keyboard", "r1", database).strip().splitlines():
                     self.assertTrue(row.endswith(","), "SDL needs a delimiter before appended CRC metadata")
                     self.assertGreaterEqual(sdl.SDL_GameControllerAddMapping(row.encode()), 0)
                 controller = sdl.SDL_GameControllerOpen(index)
@@ -89,6 +89,13 @@ class ControllerRouting(unittest.TestCase):
                     self.assertEqual(sdl.SDL_JoystickSetVirtualButton(joystick, 5, pressed), 0)
                     sdl.SDL_PumpEvents(); sdl.SDL_JoystickUpdate()
                     self.assertEqual(sdl.SDL_GameControllerGetButton(controller, 0), pressed)
+                # Profile A uses the safe shoulder route; B/X/Y remain normal
+                # SDL actions. Verify actual state changes, not only DB text.
+                for physical, logical in [(0, 10), (1, 1), (2, 2), (3, 3)]:
+                    for pressed in (1, 0):
+                        self.assertEqual(sdl.SDL_JoystickSetVirtualButton(joystick, physical, pressed), 0)
+                        sdl.SDL_PumpEvents(); sdl.SDL_JoystickUpdate()
+                        self.assertEqual(sdl.SDL_GameControllerGetButton(controller, logical), pressed)
                 sdl.SDL_GameControllerClose(controller)
             sdl.SDL_JoystickClose(joystick)
         finally:
@@ -104,11 +111,13 @@ print(open("/proc/self/comm").read().strip())
         result = subprocess.run(["python3", "-c", code], capture_output=True, text=True, check=True)
         self.assertEqual(result.stdout.strip(), "ruffle-native.a")
 
-    def test_darkosre_helper_receives_select_and_kernel_process_name(self):
+    def test_darkos_names_receive_select_and_kernel_process_name(self):
         body = (CORE / "launch.sh").read_text()
         functions = body[body.index("start_click_helper() {"):body.index("cleanup_runtime() {")]
         for cfw, flag, hotkey, target in [
             ("dArkOSRE", "-Z", "back", "ruffle-native.a"),
+            ("dArkOS", "-Z", "back", "ruffle-native.a"),
+            ("dArkOS 13", "-Z", "back", "ruffle-native.a"),
             ("EmuELEC", "-1", "guide", "ruffle-native.aarch64"),
             ("NextUI", "-1", "guide", "ruffle-native.aarch64"),
         ]:
@@ -157,7 +166,7 @@ print(open("/proc/self/comm").read().strip())
                       + setup +
                       'INPUT_PID=""; INPUT_CFG=""; INPUT_MAP=""\n'+functions+
                       '\nstart_click_helper ruffle-native.aarch64 "$2/default.profile"\n'
-                      'printf "%s\\n%s\\n%s\\n" "$RUFFLE_NATIVE_CLICK_BUTTON" "$RUFFLE_CLICK_BUTTON" "$RUFFLE_CONTROLLER_DB"\n'
+                      'printf "%s\\n%s\\n" "$RUFFLE_NATIVE_CLICK_BUTTON" "$RUFFLE_CLICK_BUTTON"; cat "$RUFFLE_CONTROLLER_DB_FILE"\n'
                       'wait "$INPUT_PID"; INPUT_PID=""; stop_click_helper\n')
             result = subprocess.run(["bash", "-c", script, "click-test", str(CORE / "lib/control_profiles.sh"),
                                      str(CORE.parents[1] / "profiles"), temp], check=True, capture_output=True, text=True)

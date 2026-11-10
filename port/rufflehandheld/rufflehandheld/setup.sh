@@ -1,7 +1,7 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.35 offline installer wrapper.
+# Ruffle Handheld v0.8.36-rc4 offline installer wrapper.
 
-VERSION="0.8.35"
+VERSION="0.8.36-rc4"
 APP_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
 # Keep the last installer attempt when a firmware returns straight to Ports.
 # Game logs remain separate and continue to be overwritten per SWF.
@@ -55,6 +55,8 @@ find_portmaster_control() {
         "$(dirname "$PORTS_DIR")/ports/PortMaster/control.txt" \
         /opt/system/Tools/PortMaster/control.txt \
         /opt/tools/PortMaster/control.txt \
+        /mnt/mmc/MUOS/PortMaster/control.txt \
+        /mnt/sdcard/MUOS/PortMaster/control.txt \
         "${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/PortMaster/control.txt" \
         /roms/ports/PortMaster/control.txt \
         /roms2/ports/PortMaster/control.txt \
@@ -68,7 +70,7 @@ find_portmaster_control() {
 root_from_ports_path() {
     cursor="$1"; depth=0
     while [ "$depth" -lt 4 ]; do
-        case "$(basename "$cursor")" in
+        case "$(basename "$cursor" | tr '[:upper:]' '[:lower:]')" in
             ports|ports_scripts) dirname "$cursor"; return 0 ;;
         esac
         parent="$(dirname "$cursor")"
@@ -80,6 +82,9 @@ root_from_ports_path() {
 
 PM_CONTROL="$(find_portmaster_control 2>/dev/null || true)"
 CFW_NAME="${RUFFLE_CFW_NAME:-}"
+if [ -z "$CFW_NAME" ] && [ -n "$PM_CONTROL" ]; then
+    case "$PM_CONTROL" in */MUOS/PortMaster/control.txt) CFW_NAME=muOS ;; esac
+fi
 CFW_VERSION=""
 PM_ROMROOT=""
 if [ -n "$PM_CONTROL" ]; then
@@ -287,10 +292,14 @@ restart_process_fallback() {
 }
 
 restart_batocera_es() {
-    command -v batocera-es-swissknife >/dev/null 2>&1 || return 1
+    local swissknife=""
+    for candidate in knulli-es-swissknife batocera-es-swissknife; do
+        if command -v "$candidate" >/dev/null 2>&1; then swissknife="$candidate"; break; fi
+    done
+    [ -n "$swissknife" ] || return 1
     old_pid="$(frontend_pid 2>/dev/null || true)"
-    echo "  Knulli/Batocera adapter: batocera-es-swissknife --restart"
-    batocera-es-swissknife --restart >/dev/null 2>&1 || return 1
+    echo "  Knulli/Batocera adapter: $swissknife --restart"
+    "$swissknife" --restart >/dev/null 2>&1 || return 1
     checks=0
     while [ "$checks" -lt 12 ]; do
         new_pid="$(frontend_pid 2>/dev/null || true)"
@@ -305,6 +314,7 @@ restart_batocera_es() {
 }
 
 echo "[2/3] Reloading the frontend..."
+echo "  The menu may close and reopen. This launcher installs/repairs Ruffle Handheld."
 RELOAD_OK=0
 if [ "${RUFFLE_SKIP_RESTART:-0}" = "1" ]; then
     echo "  Reload skipped by test/maintenance environment."
@@ -353,7 +363,7 @@ else
     esac
 fi
 
-echo "[3/3] Verifying the active frontend integration..."
+echo "[3/3] Checking installed frontend configuration..."
 if [ -e "$ROMROOT/flash_runtime" ]; then
     die "the obsolete root-level flash_runtime directory still exists"
 fi
@@ -413,11 +423,12 @@ case "$(printf '%s' "$CFW_NAME" | tr '[:upper:]' '[:lower:]')" in
 esac
 fi
 
-echo "Installation verified."
+echo "Installation files verified. Game execution has not been tested by this installer."
 if [ "$IS_NEXTUI" -eq 1 ]; then
     echo "Games: $ROMROOT/Flash (FLASH)"
 else
     echo "Games: $ROMROOT/flash"
+    echo "Launch SWF games from the Flash system in the main menu."
 fi
 echo "Multi-file data: $ROMROOT/flash_data"
 echo "Runtime: $APP_DIR/runtime"

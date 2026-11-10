@@ -21,8 +21,11 @@ fi
 source "$controlfolder/control.txt"
 [ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
 type get_controls >/dev/null 2>&1 && get_controls >/dev/null 2>&1 || true
+export -n sdl_controllerconfig SDL_GAMECONTROLLERCONFIG RUFFLE_CONTROLLER_DB RUFFLE_ES_CONTROLLER_DB 2>/dev/null || true
 # Use the database resolved by the dispatcher, including file-only SDL maps.
-if [ -n "${RUFFLE_CONTROLLER_DB:-}" ]; then
+if [ -r "${RUFFLE_CONTROLLER_DB_FILE:-}" ]; then
+    sdl_controllerconfig="$(cat "$RUFFLE_CONTROLLER_DB_FILE")"
+elif [ -n "${RUFFLE_CONTROLLER_DB:-}" ]; then
     sdl_controllerconfig="$RUFFLE_CONTROLLER_DB"
 elif [ -z "${sdl_controllerconfig:-}" ]; then
     if [ -n "${SDL_GAMECONTROLLERCONFIG:-}" ]; then
@@ -211,23 +214,22 @@ rh_valid_keycode "$A_KEYCODE" && A_ROUTE="keyboard"
 if [ -n "${sdl_controllerconfig:-}" ]; then
     ORIGINAL_SDL_CONTROLLERCONFIG="$sdl_controllerconfig"
     sdl_controllerconfig="$(rh_route_profile_input "$A_ROUTE" "${RUFFLE_NATIVE_CLICK_BUTTON:-none}" "$sdl_controllerconfig")"
+    sdl_controllerconfig="$(rh_route_mouse_stick "${RUFFLE_MOUSE_STICK:-right}" "$sdl_controllerconfig")"
 fi
 rh_write_config_ron "$PROFILE" "$DEFAULT_PROFILE" "$DATA_ROOT/config.ron" "movie.swf" || { echo "ERROR: could not build config.ron"; exit 12; }
-if [ "${RUFFLE_DEBUG:-0}" = "1" ]; then
-    echo "Generated native gamepad map:"
-    cat "$DATA_ROOT/config.ron"
-else
-    echo "Native gamepad profile: generated"
-fi
+echo "Generated native gamepad map:"
+cat "$DATA_ROOT/config.ron"
+echo "Effective SDL controller bindings (up to 8 rows):"
+printf '%s\n' "${sdl_controllerconfig:-}" | awk -F, 'NF >= 3 && !/^#/ && ++n <= 8 { print }'
+
 
 type pm_platform_helper >/dev/null 2>&1 && pm_platform_helper "$BIN"
 unset DISPLAY WAYLAND_DISPLAY
 export SDL_VIDEODRIVER="${RUFFLE_SDL_VIDEODRIVER:-kmsdrm}"
 export SDL_AUDIODRIVER="${RUFFLE_SDL_AUDIODRIVER:-alsa}"
 if [ -n "${sdl_controllerconfig:-}" ]; then
-    export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
     printf '%s\n' "$sdl_controllerconfig" > "$DATA_ROOT/gamecontrollerdb.profile.txt"
-    export SDL_GAMECONTROLLERCONFIG_FILE="$DATA_ROOT/gamecontrollerdb.profile.txt"
+    rh_use_controller_file "$DATA_ROOT/gamecontrollerdb.profile.txt"
 else
     export SDL_GAMECONTROLLERCONFIG_FILE="${SDL_GAMECONTROLLERCONFIG_FILE:-$controlfolder/gamecontrollerdb.txt}"
 fi

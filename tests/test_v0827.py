@@ -162,7 +162,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertNotIn("mouse_movement_up", cfg)
             logs = list((app / "logs").glob("*.log"))
             self.assertEqual(sorted(path.name for path in logs), ["Bejeweled_2.swf.log", "LAST-INSTALL.log"])
-            self.assertIn("Installation verified.", (app / "logs/LAST-INSTALL.log").read_text())
+            self.assertIn("Installation files verified.", (app / "logs/LAST-INSTALL.log").read_text())
             self.assertFalse((app / "logs/native").exists())
             self.assertFalse(any(path.name.startswith("LAST-") and path.name != "LAST-INSTALL.log"
                                  for path in (app / "logs").iterdir()))
@@ -403,7 +403,7 @@ class ReleaseTests(unittest.TestCase):
             launchers = sorted(ports.glob("Flash - *.sh"))
             self.assertEqual(len(launchers), 3)
             self.assertFalse((romroot / "es_systems.cfg").exists())
-            self.assertEqual((app / "installed-version").read_text().strip(), "0.8.35")
+            self.assertEqual((app / "installed-version").read_text().strip(), "0.8.36-rc4")
             for launcher in launchers:
                 if launcher == original:
                     continue
@@ -494,7 +494,7 @@ class ReleaseTests(unittest.TestCase):
             launcher = ports / "Flash - Stock Game.sh"
             self.assertTrue(launcher.stat().st_mode & stat.S_IXUSR)
             self.assertFalse((romroot / "es_systems.cfg").exists())
-            self.assertEqual((app / "installed-version").read_text().strip(), "0.8.35")
+            self.assertEqual((app / "installed-version").read_text().strip(), "0.8.36-rc4")
             run("bash", launcher, env=env)
             self.assertEqual(marker.read_text().strip(), "SDL=mali")
             shutil.copy2(APP_SOURCE / "runtime/core/native_v020/libruffle_cursorfix.aarch64.so",

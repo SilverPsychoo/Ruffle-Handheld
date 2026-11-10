@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.35 path adapter.
+# Ruffle Handheld v0.8.36-rc4 path adapter.
 # The v0.7.7 runtime layout is reproduced under /tmp without exposing it beside
 # the user's ROMs. Frozen binaries and their expected paths remain unchanged.
 
@@ -83,6 +83,8 @@ find_portmaster_control() {
     for candidate in \
         /opt/system/Tools/PortMaster/control.txt \
         /opt/tools/PortMaster/control.txt \
+        /mnt/mmc/MUOS/PortMaster/control.txt \
+        /mnt/sdcard/MUOS/PortMaster/control.txt \
         "${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/PortMaster/control.txt" \
         "$(dirname "$APP_DIR")/PortMaster/control.txt" \
         "$ROMROOT/ports/PortMaster/control.txt" \

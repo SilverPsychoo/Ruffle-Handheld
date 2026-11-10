@@ -58,7 +58,7 @@ class FrontendArguments(unittest.TestCase):
                     with self.subTest(game=name):
                         game = roms / "flash" / name
                         game.write_bytes(b"FWS-host-probe")
-                        shell_command = command.replace("%ROM_RAW%", str(game)).replace("%ROM%", es_escape(game))
+                        shell_command = command.replace("%ROM_RAW%", str(game)).replace("%ROM%", es_escape(game)).replace("%CONTROLLERSCONFIG%", "")
                         run("/bin/sh", "-c", shell_command, env=env, cwd=root)
                         self.assertEqual(marker.read_text().strip(), str(game))
                         marker.unlink()
@@ -68,15 +68,15 @@ class FrontendArguments(unittest.TestCase):
                      "profile-test", APP_SOURCE / "runtime/core/lib/control_profiles.sh", APP_SOURCE / "profiles")
         self.assertEqual(Path(result.stdout.strip()).name, "henry-stickmin-breaking-the-bank.profile")
 
-    def test_blue_rabbit_uses_the_generic_click_route(self):
+    def test_blue_rabbit_preserves_the_repository_mouse_profile(self):
         for name in ("Blue Rabbit's Climate Chaos", "Blue Rabbit: Climate Chaos"):
             with self.subTest(name=name):
                 result = run("bash", "-c", 'source "$1"; rh_resolve_profile "$2" "$3"',
                              "profile-test", APP_SOURCE / "runtime/core/lib/control_profiles.sh",
                              APP_SOURCE / "profiles", name)
                 profile = Path(result.stdout.strip())
-                self.assertEqual(profile.name, "default.profile")
-                self.assertIn("mouse_click=r1", profile.read_text())
+                self.assertEqual(profile.name, "blue-rabbit-s-climate-chaos.profile")
+                self.assertIn("mouse_click=a", profile.read_text())
 
     def test_tuper_tario_controls_follow_published_keys(self):
         with tempfile.TemporaryDirectory(prefix="ruffle-tuper-") as temp:
