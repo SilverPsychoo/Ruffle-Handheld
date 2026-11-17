@@ -4,13 +4,11 @@
 
 Play Flash games on ARM64 Linux handhelds. Ruffle Handheld adds them to the games menu, supports single-file and multi-file SWF games, and runs without an Internet connection. Games are not included.
 
-**Release v6.0 (Ruffle Handheld v0.9.0).** See [Compatibility](#compatibility) for system-specific details.
-
 ## Installation
 
 On firmware supported by PortMaster, download `rufflehandheld.zip`, copy it **without extracting it** to PortMaster's `autoinstall` folder, and open PortMaster. See [PortMaster's folder locations](https://portmaster.games/faq.html) for your firmware. Then run **Ruffle Handheld** from Ports once to set up the Flash library. This local ZIP does not require an online catalogue listing.
 
-For manual installation, download `Ruffle-Handheld-v0.9.0-OFFLINE.zip` and extract it. The ZIP contains `Ruffle Handheld.sh` and the `rufflehandheld` folder.
+For manual installation, extract `rufflehandheld.zip` from [GitHub Releases](https://github.com/SilverPsychoo/Ruffle-Handheld/releases). It contains `Ruffle Handheld.sh` and the `rufflehandheld` folder.
 
 | System | Where to copy the files |
 | --- | --- |
@@ -63,7 +61,7 @@ The default mapping is for games that mix keyboard and mouse controls:
 | Right stick | Mouse cursor, if available |
 | Start / Select | Enter / Escape |
 
-Some games have included profiles that change these controls. For mouse-only games such as Bejeweled 2, A is the click button. Ruffle Handheld reads the controller mapping supplied by the firmware, so a game should not need its own profile merely to make R1 click. Start+Select exits the game on supported systems.
+Some games have included profiles that change these controls. For mouse-only games such as Bejeweled 2, A is the click button. Ruffle Handheld reads the controller mapping supplied by the firmware, so a game should not need its own profile merely to make R1 click. Start+Select is intended as the exit shortcut where PortMaster provides it; it still needs confirmation on some systems, including dArkOSRE.
 
 To change controls for a game, open `ports/rufflehandheld/profile-maker.html` in a browser on your phone or computer. Enter the SWF filename, choose the mouse stick and assign the buttons, download the `.profile` file and copy it to `ports/rufflehandheld/profiles/custom/`. It works offline. Custom profiles take priority over the included ones and are kept during updates.
 
@@ -74,13 +72,12 @@ The mouse uses the right stick by default. To use the left stick, select it in t
 | Firmware | Current status |
 | --- | --- |
 | EmuELEC | Tested on RK3326 ARM64 hardware. |
-| ArkOS / dArkOS | Supports the Flash collection in EmulationStation. Controller behavior can vary by device. |
-| muOS on H700 | Games launch from Ports. Some games may need control adjustments. |
-| Stock Mod OS on H700 | Adds Flash games to Ports. |
-| ROCKNIX | The player has launched on Flip. Compatibility varies by game. |
-| NextUI / TrimUI Brick | Adds a Flash library. Display and cursor behavior can vary by game. |
-| Knulli | Game launch and left-stick mouse control have been reported working. Issues with Space and Start+Select have also been reported. |
-| AmberELEC and other ARM64 Linux systems | Compatibility varies by device and firmware. |
+| ArkOS / dArkOS | Installation and control support included; reports of launch, click and exit issues still need device testing. |
+| muOS on H700 | Community testing confirms games launch. Some buttons reported in older builds still need investigation. |
+| Stock Mod OS on H700 | Creates game scripts in Ports and selects the `mali` video driver. Console testing of this update is pending. |
+| ROCKNIX | Reported to reach the game player on Flip; controls and individual games need further testing. |
+| NextUI / TrimUI Brick | Installer and game player have run on the device. Cursor movement and games appearing in a quarter of the screen remain under investigation. |
+| AmberELEC / Knulli / other ARM64 Linux systems | Installation adapters included; results vary by device and firmware. |
 
 A game may fail because of an unsupported Flash feature or limited memory, even when installation and controls work. Ruffle Handheld includes an ARM64 build of the game player; it does not include Adobe Flash Player.
 
