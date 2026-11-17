@@ -1,7 +1,7 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.36-rc4 offline installer wrapper.
+# Ruffle Handheld v0.9.0 offline installer wrapper.
 
-VERSION="0.8.36-rc4"
+VERSION="0.9.0"
 APP_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
 # Keep the last installer attempt when a firmware returns straight to Ports.
 # Game logs remain separate and continue to be overwritten per SWF.

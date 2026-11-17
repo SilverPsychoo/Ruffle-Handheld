@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.36-rc4 core installer.
+# Ruffle Handheld v0.9.0 core installer.
 # Registers the frozen v0.7.7 core in-place inside the Ruffle Handheld bundle.
 
 ROMROOT="$1"
@@ -54,7 +54,7 @@ for migrated_log in \
     [ -f "$migrated_log" ] && rm -f "$migrated_log"
 done
 
-echo "=== Core install: v0.7.7 binaries under v0.8.36-rc4 installer ==="
+echo "=== Core install: v0.7.7 binaries under v0.9.0 installer ==="
 echo "ROM root: $ROMROOT"
 echo "Application: $APP_DIR"
 echo "CFW adapter: $CFW_NAME"
@@ -311,13 +311,13 @@ PAK_LAUNCH
         [ -e "$NEXTUI_PAK/background_icon.png" ] || \
             cp "$APP_DIR/theme/background_icon.png" "$NEXTUI_PAK/background_icon.png" || true
         printf '%s\n' "$NEXTUI_PAK" > "$STATE_DIR/nextui-pak.path" || exit 20
-        printf '%s\n' "0.8.36-rc4" > "$APP_DIR/installed-version"
+        printf '%s\n' "0.9.0" > "$APP_DIR/installed-version"
         [ -x "$NEXTUI_PAK/launch.sh" ] || exit 26
         [ -d "$FLASHDIR" ] && [ -d "$DATADIR" ] || exit 27
         [ -f "$PROFILEDIR/default.profile" ] || exit 28
         [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
         sync
-        echo "  frontend adapter: nextui-standalone-pak-community-test"
+        echo "  frontend adapter: nextui-standalone-pak"
         echo "  Flash PAK: $NEXTUI_PAK"
         echo "  Games: $FLASHDIR"
         echo "Core installation complete and verified."
@@ -370,7 +370,7 @@ PORTS_LAUNCH
             printf '%s\n' "$launcher" >> "$STATE_DIR/ports-launchers.paths" || return 1
             PORTS_GAME_COUNT=$((PORTS_GAME_COUNT + 1))
         done
-        printf '%s\n' "0.8.36-rc4" > "$APP_DIR/installed-version" || return 1
+        printf '%s\n' "0.9.0" > "$APP_DIR/installed-version" || return 1
         echo "  Ports game launchers: $PORTS_GAME_COUNT"
         echo "  Games: $FLASHDIR"
         [ "$PORTS_GAME_COUNT" -gt 0 ] || echo "  Add SWF files to $FLASHDIR and run Ruffle Handheld again to create menu entries."
@@ -503,7 +503,7 @@ if [ -z "$ES_CFG" ]; then
             ES_CFG="${RUFFLE_KNULLI_ES_CONFIG:-/userdata/system/configs/emulationstation/es_systems_rufflehandheld.cfg}"
             ;;
         *arkos*|*darkos*)
-            ES_ADAPTER="arkos-official-config-community-test"
+            ES_ADAPTER="arkos-official-config"
             # ArkOS itself updates /etc/emulationstation/es_systems.cfg and
             # documents it as the active system list. Prefer it over a stale
             # per-user copy, using passwordless sudo only when already present.
@@ -514,7 +514,7 @@ if [ -z "$ES_CFG" ]; then
             done
             ;;
         *rocknix*)
-            ES_ADAPTER="rocknix-user-copy-community-test"
+            ES_ADAPTER="rocknix-user-copy"
             materialize_rocknix_config || {
                 echo "ERROR: could not create the writable ROCKNIX EmulationStation configuration"
                 exit 21
@@ -867,7 +867,7 @@ done
 [ -f "$PROFILEDIR/default.profile" ] || exit 28
 [ -d "$PROFILEDIR/custom" ] || exit 28
 [ ! -e "$ROMROOT/flash_runtime" ] || { echo "ERROR: obsolete root-level flash_runtime remains"; exit 28; }
-printf '%s\n' "0.8.36-rc4" > "$APP_DIR/installed-version"
+printf '%s\n' "0.9.0" > "$APP_DIR/installed-version"
 sync
 echo "Core installation complete and verified."
 exit 0

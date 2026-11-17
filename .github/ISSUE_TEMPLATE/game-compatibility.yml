@@ -13,7 +13,7 @@ body:
     validations: {required: true}
   - type: input
     id: version
-    attributes: {label: Ruffle Handheld version, placeholder: "0.8.17"}
+    attributes: {label: Ruffle Handheld version, placeholder: "0.9.0"}
     validations: {required: true}
   - type: input
     id: device

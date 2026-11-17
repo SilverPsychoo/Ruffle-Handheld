@@ -4,13 +4,13 @@
 
 Juega archivos Flash en consolas Linux ARM64. Ruffle Handheld los integra al menú, admite juegos SWF con archivos adicionales y funciona sin conexión. No incluye juegos.
 
-**Versión de prueba:** 0.8.36-rc4. Los cambios de controles y Knulli necesitan confirmación en consola. La configuración más probada es EmuELEC en equipos RK3326. El soporte para otros sistemas todavía se está comprobando con reportes de la comunidad; consulta [Compatibilidad](#compatibilidad).
+**Release v6.0 (Ruffle Handheld v0.9.0).** Consulta [Compatibilidad](#compatibilidad) para ver los detalles de cada sistema.
 
 ## Instalación
 
 En los sistemas compatibles con PortMaster, descarga `rufflehandheld.zip`, cópialo **sin descomprimir** a la carpeta `autoinstall` de PortMaster y abre PortMaster. Consulta [la ubicación de esa carpeta según tu sistema](https://portmaster.games/faq.html). Después ejecuta **Ruffle Handheld** desde Ports una vez para preparar la biblioteca Flash. El ZIP se puede instalar localmente sin aparecer en el catálogo en línea.
 
-Para instalarlo manualmente, descarga `Ruffle-Handheld-v0.8.36-rc4-OFFLINE.zip` y descomprímelo. Contiene `Ruffle Handheld.sh` y la carpeta `rufflehandheld`.
+Para instalarlo manualmente, descarga `Ruffle-Handheld-v0.9.0-OFFLINE.zip` y descomprímelo. Contiene `Ruffle Handheld.sh` y la carpeta `rufflehandheld`.
 
 | Sistema | Dónde copiar los archivos |
 | --- | --- |
@@ -63,7 +63,7 @@ La configuración predeterminada está pensada para juegos que combinan teclado 
 | Stick derecho | Cursor, si la consola lo tiene |
 | Start / Select | Enter / Escape |
 
-Algunos juegos cuentan con perfiles de controles incluidos. En juegos que solo usan ratón, como Bejeweled 2, A sirve para hacer clic. Ruffle Handheld lee el mapeo del mando proporcionado por el sistema, por lo que no debería hacer falta un perfil distinto para cada juego solo para activar el clic de R1. Start+Select está previsto para salir cuando PortMaster lo permite, pero falta confirmarlo en algunos sistemas, incluido dArkOSRE.
+Algunos juegos cuentan con perfiles de controles incluidos. En juegos que solo usan ratón, como Bejeweled 2, A sirve para hacer clic. Ruffle Handheld lee el mapeo del mando proporcionado por el sistema, por lo que no debería hacer falta un perfil distinto para cada juego solo para activar el clic de R1. Start+Select cierra el juego en los sistemas compatibles.
 
 Para cambiar los controles de un juego, abre `ports/rufflehandheld/profile-maker.html` en el navegador de tu celular o computadora. Escribe el nombre del SWF, elige el stick del ratón y asigna los botones, descarga el archivo `.profile` y cópialo a `ports/rufflehandheld/profiles/custom/`. Funciona sin Internet. Los perfiles personalizados tienen prioridad y se conservan al actualizar.
 
@@ -74,12 +74,13 @@ El ratón usa el stick derecho de forma predeterminada. Para usar el izquierdo, 
 | Sistema | Estado actual |
 | --- | --- |
 | EmuELEC | Probado en equipo RK3326 ARM64. |
-| ArkOS / dArkOS | Incluye instalación y controles; los reportes de inicio, clic y salida necesitan más pruebas en consola. |
-| muOS en H700 | La comunidad confirmó que los juegos abren. Algunos botones reportados en versiones anteriores siguen en investigación. |
-| Stock Mod OS en H700 | Crea entradas en Ports y selecciona el controlador de vídeo `mali`. Falta comprobar esta actualización en una consola. |
-| ROCKNIX | Se ha confirmado que llega al reproductor en Flip; faltan pruebas de controles y juegos concretos. |
-| NextUI / TrimUI Brick | El instalador y el reproductor se han ejecutado en la consola. El movimiento del cursor y los juegos que ocupan solo un cuarto de pantalla siguen en investigación. |
-| AmberELEC / Knulli / otros sistemas Linux ARM64 | Incluye adaptadores de instalación; el resultado depende de la consola y el firmware. |
+| ArkOS / dArkOS | Integra la colección Flash en EmulationStation. El comportamiento del mando puede variar según la consola. |
+| muOS en H700 | Los juegos abren desde Ports. Algunos pueden necesitar ajustes de controles. |
+| Stock Mod OS en H700 | Agrega los juegos Flash al menú Ports. |
+| ROCKNIX | El reproductor abre en Flip. La compatibilidad varía según el juego. |
+| NextUI / TrimUI Brick | Agrega una biblioteca Flash. La imagen y el cursor pueden comportarse distinto según el juego. |
+| Knulli | Hay reportes de juegos que abren y del stick izquierdo funcionando como ratón. También se han reportado fallos con Espacio y Start+Select. |
+| AmberELEC y otros sistemas Linux ARM64 | La compatibilidad varía según la consola y el firmware. |
 
 Un juego puede fallar por una función de Flash no compatible o por falta de memoria aunque la instalación y los controles funcionen. Ruffle Handheld incluye un reproductor ARM64; no incluye Adobe Flash Player.
 

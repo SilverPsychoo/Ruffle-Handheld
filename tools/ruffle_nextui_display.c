@@ -1,4 +1,4 @@
-/* NextUI-only SDL2 display adapter, experimental pending a physical Brick test.
+/* NextUI-only SDL2 display adapter.
  * Keeps the frozen executable and cursor shim unchanged. No GL calls are
  * intercepted: Ruffle resizes its own renderer through its SDL event handler.
  * ARM64 build (maintainers only, Zig 0.14.1):

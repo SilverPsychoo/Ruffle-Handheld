@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ruffle Handheld v0.8.36-rc4 frontend boundary and per-game log adapter.
+# Ruffle Handheld v0.9.0 frontend boundary and per-game log adapter.
 
 set -u
 RUNTIME_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)" || exit 2
@@ -51,7 +51,7 @@ export RUFFLE_AUX_LOG_DIR="$AUXDIR"
 export RUFFLE_GAME_LOG="$LOG"
 
 {
-    echo "Ruffle Handheld per-game log v0.8.36-rc4"
+    echo "Ruffle Handheld per-game log v0.9.0"
     echo "Game: $BASE"
     echo "Date: $(date 2>/dev/null || echo unavailable)"
     echo "Script: $0"
